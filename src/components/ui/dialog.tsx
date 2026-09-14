@@ -20,9 +20,17 @@ export function Dialog({
     if (!open) return;
 
     const handleEscapeKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onOpenChange?.(false);
+      if (event.key !== "Escape") return;
+      // A dropdown or calendar open inside the dialog (Radix popper) takes
+      // Escape for itself — closing the whole dialog would throw away a
+      // half-filled form.
+      if (
+        event.defaultPrevented ||
+        document.querySelector("[data-radix-popper-content-wrapper]")
+      ) {
+        return;
       }
+      onOpenChange?.(false);
     };
 
     window.addEventListener("keydown", handleEscapeKey);
