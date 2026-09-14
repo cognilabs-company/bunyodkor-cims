@@ -305,7 +305,8 @@ export interface GroupCreateRequest {
   description: string;
   schedule_days: string;
   schedule_time: string;
-  capacity: number;
+  /** Optional: display-only, limits nothing. The UI no longer sends it. */
+  capacity?: number;
   coach_id: number;
 }
 

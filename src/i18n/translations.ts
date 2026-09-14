@@ -166,9 +166,6 @@
     selectCoach: "Select a coach",
     capacity: "Capacity",
     capacityRequired: "Capacity is required",
-    capacityRange: "Capacity must be between 1 and 50",
-    capacityDisplayOnlyHint:
-      "Shown for reference only — enrolment is capped by the birth-year limit, not by this.",
     noChangesToSave: "Nothing changed",
     enrolled: "Enrolled",
     availableSlots: "available",
@@ -1281,9 +1278,6 @@
     selectCoach: "O'qituvchi tanlang",
     capacity: "Sig'im",
     capacityRequired: "Sig'im talab qilinadi",
-    capacityRange: "Sig'im 1 dan 50 gacha bo'lishi kerak",
-    capacityDisplayOnlyHint:
-      "Faqat ma'lumot uchun — ro'yxatga olish yillik limit bilan cheklanadi, bu bilan emas.",
     noChangesToSave: "Hech narsa o'zgarmadi",
     enrolled: "Ro'yxatga olingan",
     availableSlots: "bo'sh",
@@ -2409,9 +2403,6 @@
     selectCoach: "Выберите тренера",
     capacity: "Вместимость",
     capacityRequired: "Вместимость обязательна",
-    capacityRange: "Вместимость должна быть от 1 до 50",
-    capacityDisplayOnlyHint:
-      "Только для справки — набор ограничивается годовым лимитом, а не этим полем.",
     noChangesToSave: "Ничего не изменилось",
     enrolled: "Записано",
     availableSlots: "доступно",

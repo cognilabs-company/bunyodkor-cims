@@ -37,7 +37,6 @@ type GroupFormData = {
   description: string;
   schedule_days: string;
   schedule_time: string;
-  capacity: number | string;
   coach_id: number | string;
 };
 
@@ -140,7 +139,6 @@ export function GroupDialog({
           description: group.description,
           schedule_days: normalizeScheduleDays(group.schedule_days),
           schedule_time: group.schedule_time,
-          capacity: group.capacity,
           coach_id: group.coach_id,
         });
       } else {
@@ -151,7 +149,6 @@ export function GroupDialog({
           description: "",
           schedule_days: "Mon-Wed-Fri",
           schedule_time: "14:00-16:00",
-          capacity: 25, // Default sig'im
           coach_id: "",
         });
       }
@@ -197,8 +194,8 @@ export function GroupDialog({
     if (group) {
       // PATCH /groups/{id} is a partial update, and it rejects `identifier` and
       // `birth_year` with a 400 because contract numbers are built from them.
-      // So send only the fields the user actually changed. Schedule and
-      // capacity are not offered in edit mode, so they never appear here.
+      // So send only the fields the user actually changed. Schedule is not
+      // offered in edit mode, so it never appears here.
       const changed: GroupUpdateRequest = {};
 
       if (data.name !== group.name) changed.name = data.name;
@@ -224,7 +221,6 @@ export function GroupDialog({
       description: data.description,
       schedule_days: normalizeScheduleDays(data.schedule_days),
       schedule_time: data.schedule_time,
-      capacity: Number(data.capacity),
       coach_id: Number(data.coach_id),
     };
 
@@ -277,65 +273,32 @@ export function GroupDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label htmlFor="birth_year">
-                {t("birthYear")} <span className="text-red-500">*</span>
-              </Label>
-              {/* Frozen for the same reason as `identifier`. */}
-              <Input
-                id="birth_year"
-                type="number"
-                placeholder="2015"
-                readOnly={isEdit}
-                aria-readonly={isEdit}
-                tabIndex={isEdit ? -1 : undefined}
-                className={
-                  isEdit ? "bg-muted/50 cursor-not-allowed font-mono" : undefined
-                }
-                {...register("birth_year", {
-                  required: t("birthYearRequired"),
-                  valueAsNumber: true,
-                })}
-              />
-              {errors.birth_year && (
-                <p className="text-sm text-red-500">
-                  {errors.birth_year.message}
-                </p>
-              )}
-            </div>
-
-            {/* Capacity is set once, at creation. The year's limit is edited
-                from its birth-year heading on the Groups page. */}
-            {!isEdit && (
-              <div className="space-y-1">
-                <Label htmlFor="capacity">
-                  {t("capacity")} <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="capacity"
-                  type="number"
-                  min={1}
-                  max={50}
-                  step={1}
-                  placeholder="25"
-                  {...register("capacity", {
-                    required: t("capacityRequired"),
-                    valueAsNumber: true,
-                    min: { value: 1, message: t("capacityRange") },
-                    max: { value: 50, message: t("capacityRange") },
-                  })}
-                />
-                {errors.capacity ? (
-                  <p className="text-sm text-red-500">
-                    {errors.capacity.message}
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    {t("capacityDisplayOnlyHint")}
-                  </p>
-                )}
-              </div>
+          {/* Capacity is not asked for at all: it limits nothing, and the
+              backend treats it as optional. */}
+          <div className="space-y-1">
+            <Label htmlFor="birth_year">
+              {t("birthYear")} <span className="text-red-500">*</span>
+            </Label>
+            {/* Frozen for the same reason as `identifier`. */}
+            <Input
+              id="birth_year"
+              type="number"
+              placeholder="2015"
+              readOnly={isEdit}
+              aria-readonly={isEdit}
+              tabIndex={isEdit ? -1 : undefined}
+              className={
+                isEdit ? "bg-muted/50 cursor-not-allowed font-mono" : undefined
+              }
+              {...register("birth_year", {
+                required: t("birthYearRequired"),
+                valueAsNumber: true,
+              })}
+            />
+            {errors.birth_year && (
+              <p className="text-sm text-red-500">
+                {errors.birth_year.message}
+              </p>
             )}
           </div>
 
