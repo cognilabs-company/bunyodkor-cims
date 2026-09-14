@@ -55,8 +55,10 @@ import type {
   StudentRead,
   ContractRead,
   GroupsStatisticsResponse,
+  YearLimitUsage,
 } from "@/types/api";
 import { GroupDialog } from "./GroupDialog";
+import { YearLimitDialog } from "@/pages/year-limits/YearLimitDialog";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { apiClient } from "@/lib/api-client";
 import { downloadFile } from "@/lib/export-utils";
@@ -132,6 +134,13 @@ function GroupCard({
               <Clock className="w-4 h-4 text-muted-foreground" />
               <span className="text-foreground">{group.schedule_time}</span>
             </div>
+            {/* Headcount only — capacity no longer governs enrolment. */}
+            <div className="flex items-center gap-2 text-sm">
+              <UserCheck className="w-4 h-4 text-muted-foreground" />
+              <span className="text-foreground">
+                {group.active_students_count ?? 0} {t("studentsShort")}
+              </span>
+            </div>
           </div>
           {group.description && (
             <p className="text-sm text-muted-foreground line-clamp-2">
@@ -153,6 +162,13 @@ export default function Groups() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   // null = the dialog creates a new group; a group = it edits that one.
   const [groupToEdit, setGroupToEdit] = useState<GroupRead | null>(null);
+  // Limit editor opened from a birth-year heading. `limit` is set when the
+  // year already has one (edit); otherwise only `birthYear` (create, locked).
+  const [yearLimitDialog, setYearLimitDialog] = useState<{
+    open: boolean;
+    limit: YearLimitUsage | null;
+    birthYear: number | null;
+  }>({ open: false, limit: null, birthYear: null });
   const [isStudentsDialogOpen, setIsStudentsDialogOpen] = useState(false);
   const [selectedGroupForStudents, setSelectedGroupForStudents] =
     useState<GroupRead | null>(null);
@@ -345,6 +361,13 @@ export default function Groups() {
   const handleViewContracts = (group: GroupRead) => {
     setSelectedGroupForContracts(group);
     setIsContractsDialogOpen(true);
+  };
+
+  const handleEditYearLimit = (
+    birthYear: number,
+    limit: YearLimitUsage | undefined,
+  ) => {
+    setYearLimitDialog({ open: true, limit: limit ?? null, birthYear });
   };
 
   const handleViewStudents = (group: GroupRead) => {
@@ -654,9 +677,24 @@ export default function Groups() {
                     <Calendar className="w-6 h-6" />
                     {/* Year-wide enrolment limit, ahead of the year itself —
                         it is the figure that governs the whole section.
-                        Absent = no limit for this year. */}
-                    {yearLimit &&
-                      (yearLimit.is_full ? (
+                        The pencil opens the limit editor for this year. */}
+                    {canWrite("groups:edit") && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          handleEditYearLimit(yearData.birth_year, yearLimit)
+                        }
+                        aria-label={t("editYearLimit")}
+                        title={t("editYearLimit")}
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {yearLimit ? (
+                      yearLimit.is_full ? (
                         <Badge variant="destructive">
                           {t("yearLimitFullBadge")
                             .replace("{{used}}", String(yearLimit.current_count))
@@ -669,7 +707,10 @@ export default function Groups() {
                             .replace("{{used}}", String(yearLimit.current_count))
                             .replace("{{max}}", String(yearLimit.max_students))}
                         </Badge>
-                      ))}
+                      )
+                    ) : (
+                      <Badge variant="outline">{t("yearLimitUnlimited")}</Badge>
+                    )}
                     {yearData.birth_year} {t("birthYear") || "yil tug'ilganlar"}
                     <Badge variant="secondary" className="ml-auto">
                       {yearData.total_groups} {t("group")}
@@ -724,6 +765,15 @@ export default function Groups() {
             queryKey: ["groups-grouped-by-year"],
           });
         }}
+      />
+
+      <YearLimitDialog
+        open={yearLimitDialog.open}
+        onOpenChange={(open) =>
+          setYearLimitDialog((current) => ({ ...current, open }))
+        }
+        limit={yearLimitDialog.limit}
+        birthYear={yearLimitDialog.birthYear}
       />
 
       {/* Students Dialog */}

@@ -24,6 +24,11 @@ interface YearLimitDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Row being edited; `null` opens the dialog in create mode. */
   limit: YearLimitUsage | null;
+  /**
+   * Create mode for one specific year (e.g. from a birth-year heading): the
+   * year is prefilled and locked. Ignored when `limit` is given.
+   */
+  birthYear?: number | null;
   onSuccess?: () => void;
 }
 
@@ -39,11 +44,14 @@ export function YearLimitDialog({
   open,
   onOpenChange,
   limit,
+  birthYear = null,
   onSuccess,
 }: YearLimitDialogProps) {
   const { t } = useLanguageStore();
   const queryClient = useQueryClient();
   const isEdit = Boolean(limit);
+  const lockedYear = limit?.birth_year ?? birthYear;
+  const isYearLocked = lockedYear != null;
 
   const {
     register,
@@ -67,10 +75,10 @@ export function YearLimitDialog({
   useEffect(() => {
     if (!open) return;
     reset({
-      birth_year: limit?.birth_year ?? new Date().getFullYear() - 7,
+      birth_year: lockedYear ?? new Date().getFullYear() - 7,
       max_students: limit?.max_students ?? 100,
     });
-  }, [limit, open, reset]);
+  }, [limit, lockedYear, open, reset]);
 
   // Whether the typed year already has a limit is the server's answer, not the
   // dialog's mode: "New limit" + a year that is already limited must update it,
@@ -131,8 +139,10 @@ export function YearLimitDialog({
               placeholder="2020"
               // The year identifies the limit, so it cannot be edited — delete
               // the row and create a new one to move a limit to another year.
-              readOnly={isEdit}
-              className={isEdit ? "bg-muted/50 cursor-not-allowed" : undefined}
+              readOnly={isYearLocked}
+              className={
+                isYearLocked ? "bg-muted/50 cursor-not-allowed" : undefined
+              }
               {...register("birth_year", {
                 required: t("birthYearRequired"),
                 min: { value: MIN_BIRTH_YEAR, message: t("birthYearInvalid") },

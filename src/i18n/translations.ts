@@ -1091,7 +1091,7 @@
       "This is below the {{count}} students already enrolled — the year will be full immediately.",
     yearLimitAlreadySet:
       "{{year}} already has a limit of {{max}} — saving will update it.",
-    groupYearLimitLabel: "Enrolment limit for {{year}}",
+    studentsShort: "students",
     yearLimitCreated: "Year limit created",
     yearLimitUpdated: "Year limit updated",
     yearLimitDeleted: "Year limit removed — the year is unlimited again",
@@ -2227,7 +2227,7 @@
       "Bu qiymat hozir ro'yxatdagi {{count}} ta o'quvchidan kam — yil darhol to'lgan bo'ladi.",
     yearLimitAlreadySet:
       "{{year}}-yilda allaqachon {{max}} limiti bor — saqlansa o'sha yangilanadi.",
-    groupYearLimitLabel: "{{year}}-yil uchun umumiy limit",
+    studentsShort: "o'quvchi",
     yearLimitCreated: "Yillik limit yaratildi",
     yearLimitUpdated: "Yillik limit yangilandi",
     yearLimitDeleted: "Limit o'chirildi — bu yil yana cheksiz",
@@ -3320,7 +3320,7 @@
       "Это меньше, чем уже зачислено ({{count}}) — год сразу станет заполненным.",
     yearLimitAlreadySet:
       "Для {{year}} уже задан лимит {{max}} — сохранение обновит его.",
-    groupYearLimitLabel: "Лимит набора для {{year}}",
+    studentsShort: "учеников",
     yearLimitCreated: "Годовой лимит создан",
     yearLimitUpdated: "Годовой лимит обновлён",
     yearLimitDeleted: "Лимит удалён — год снова без ограничений",
