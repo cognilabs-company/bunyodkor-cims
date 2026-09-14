@@ -596,6 +596,8 @@ export const studentService = {
   createStudentWithContract: async (
     formData: FormData,
   ): Promise<{ pdf_url: string }> => {
+    // The dialog explains every failure itself (taken contract number, year
+    // limit, no response), so the raw backend message is not toasted twice.
     const response = await apiClient.post<{ pdf_url: string }>(
       "/students/create-with-contract",
       formData,
@@ -604,7 +606,8 @@ export const studentService = {
           "Content-Type": "multipart/form-data",
         },
         timeout: 120000,
-      },
+        suppressGlobalErrorToast: true,
+      } as object,
     );
 
     return response.data;

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -29,6 +29,9 @@ import {
   Copy,
   Download,
   Eye,
+  AlertTriangle,
+  Pencil,
+  RotateCcw,
 } from "lucide-react";
 
 // openPdfUrl funksiyasini ishlatamiz
@@ -150,6 +153,7 @@ export function StudentWithContractDialog({
     watch,
     setValue,
     getValues,
+    setFocus,
     formState: { errors },
   } = useForm<StudentFormData>({
     defaultValues: {
@@ -213,30 +217,77 @@ export function StudentWithContractDialog({
     }
   }, [firstName, lastName, middleName, setValue]);
 
+  // --- Contract number ---
+  // Filled automatically from GET /contracts/next-available/{group_id}. Staff
+  // may switch it to manual entry after confirming (see the confirm overlay);
+  // a manual number is never overwritten behind their back.
+  const [isNumberManual, setIsNumberManual] = useState(false);
+  const [showManualConfirm, setShowManualConfirm] = useState(false);
+  const isNumberManualRef = useRef(false);
   useEffect(() => {
-    const fetchContractNumber = async () => {
-      if (selectedGroupId && groupsData?.data) {
-        try {
-          const selectedGroup = groupsData.data.find(
-            (g: any) => g.id === Number(selectedGroupId),
-          );
-          if (!selectedGroup) return;
+    isNumberManualRef.current = isNumberManual;
+  }, [isNumberManual]);
 
-          // The next serial is the only valid contract number — assign it and
-          // display it read-only.
-          const response = await contractService.getNextAvailableNumber(
-            Number(selectedGroupId),
-          );
+  /** Next free number for the group, or null if it could not be read. */
+  const fetchNextContractNumber = async (
+    groupId: number,
+  ): Promise<string | null> => {
+    try {
+      const response = await contractService.getNextAvailableNumber(groupId);
+      return response.data?.contract_number || null;
+    } catch (error) {
+      console.error("Shartnoma raqami xatosi:", error);
+      return null;
+    }
+  };
 
-          const contractNumber = response.data.contract_number || "";
-          setValue("contract_number", contractNumber);
-        } catch (error) {
-          console.error("Shartnoma raqami xatosi:", error);
-        }
+  // Picking a group assigns its next number. Switching groups drops any manual
+  // number (it belonged to the old group) and ignores late answers for a group
+  // that is no longer selected, so a slow response can't overwrite a newer one.
+  useEffect(() => {
+    const groupId = Number(selectedGroupId);
+    if (!groupId) return;
+
+    setIsNumberManual(false);
+    let isCurrent = true;
+    void fetchNextContractNumber(groupId).then((contractNumber) => {
+      if (isCurrent && contractNumber && !isNumberManualRef.current) {
+        setValue("contract_number", contractNumber);
+      }
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedGroupId, setValue]);
+
+  const handleConfirmManualNumber = () => {
+    setShowManualConfirm(false);
+    setIsNumberManual(true);
+    // The input stops being read-only on the next render; focus it then.
+    requestAnimationFrame(() => setFocus("contract_number"));
+  };
+
+  const handleRestoreAutoNumber = async () => {
+    setIsNumberManual(false);
+    const groupId = Number(getValues("group_id"));
+    if (!groupId) return;
+    const contractNumber = await fetchNextContractNumber(groupId);
+    if (contractNumber) setValue("contract_number", contractNumber);
+  };
+
+  // Escape closes only the confirm overlay, not the whole student form.
+  useEffect(() => {
+    if (!showManualConfirm) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setShowManualConfirm(false);
       }
     };
-    fetchContractNumber();
-  }, [selectedGroupId, setValue, groupsData, birthYear, t]);
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [showManualConfirm]);
 
   // --- YANGILANGAN TUGMALAR LOGIKASI ---
 
@@ -355,6 +406,10 @@ export function StudentWithContractDialog({
 
   useEffect(() => {
     if (open) {
+      // Each new form starts with an automatic contract number.
+      setIsNumberManual(false);
+      setShowManualConfirm(false);
+
       const today = new Date().toISOString().split("T")[0];
       const currentYear = new Date().getFullYear();
       const endOfYear = `${currentYear}-12-31`;
@@ -440,6 +495,26 @@ export function StudentWithContractDialog({
         return;
       }
 
+      // The number read when the group was picked can go stale while this long
+      // form is filled in (someone else enrols into the same group meanwhile).
+      // Re-read it right before sending — unless staff entered it by hand.
+      let contractNumber = String(data.contract_number || "").trim();
+      if (!isNumberManual && data.group_id) {
+        const fresh = await fetchNextContractNumber(Number(data.group_id));
+        if (fresh && fresh !== contractNumber) {
+          contractNumber = fresh;
+          setValue("contract_number", fresh);
+          toast(t("contractNumberRefreshed").replace("{{number}}", fresh), {
+            duration: 5000,
+          });
+        }
+      }
+      if (!contractNumber) {
+        toast.error(t("enterContractNumber"));
+        setIsSubmitting(false);
+        return;
+      }
+
       await simulateProgress(0, 800);
 
       const startDateObj = new Date(data.contract_start_date);
@@ -459,7 +534,7 @@ export function StudentWithContractDialog({
       };
 
       const contract_data = {
-        contract_number: data.contract_number,
+        contract_number: contractNumber,
         student: {
           student_image: data.contract_image_1?.[0]?.name || "photo.jpg",
           student_fio: data.student_fio,
@@ -602,60 +677,81 @@ export function StudentWithContractDialog({
           /* ignore */
         }
       } else if (error.response?.data?.detail) {
+        const detail = error.response.data.detail;
         errorMessage =
-          typeof error.response.data.detail === "string"
-            ? error.response.data.detail
-            : JSON.stringify(error.response.data.detail);
+          typeof detail === "string"
+            ? detail
+            : Array.isArray(detail) && detail[0]?.msg
+              ? detail[0].msg // FastAPI validation error list
+              : JSON.stringify(detail);
+      }
+
+      const status: number | undefined = error.response?.status;
+      const sentNumber = String(getValues("contract_number") || "").trim();
+
+      // The request never got an answer. The server may still have created the
+      // student, so never suggest simply resubmitting — that is how duplicate
+      // students (and "number already used") appear.
+      if (!error.response) {
+        toast.error(t("createNoResponseCheckList"), { duration: 8000 });
+        return;
       }
 
       // 409 from the birth-year limit (the year filled up between the banner
       // loading and submit): re-read the counters so the banner and the submit
-      // button catch up with the server. The message itself is shown below.
-      if (error.response?.status === 409) {
+      // button catch up with the server.
+      if (status === 409) {
         invalidateYearLimits(queryClient);
       }
 
-      const isDuplicateContract =
-        errorMessage.toLowerCase().includes("already exists") ||
-        errorMessage.toLowerCase().includes("mavjud") ||
-        errorMessage.toLowerCase().includes("duplicate");
+      // The backend has worded this as "already exists", "already used",
+      // "just taken", "duplicate" and "mavjud"; match them all ("mavjud emas"
+      // means the opposite, so it is excluded).
+      const isContractNumberTaken =
+        /already (used|exists|taken)|just taken|duplicate|mavjud(?! emas)|band qilingan|allaqachon/i.test(
+          errorMessage,
+        );
 
-      if (isDuplicateContract && data.group_id) {
-        try {
-          toast(
-            t("retryingWithNewNumber"),
+      if (isContractNumberTaken && data.group_id) {
+        if (isNumberManual) {
+          // Staff chose this number; don't swap it for them.
+          toast.error(
+            t("manualContractNumberTaken").replace("{{number}}", sentNumber),
+            { duration: 8000 },
           );
-          const year =
-            data.birth_year && data.birth_year.toString().length === 4
-              ? Number(data.birth_year)
-              : new Date().getFullYear();
-          const response = await contractService.getNextAvailableNumber(
-            Number(data.group_id),
-            year,
-          );
-
-          if (response.data.contract_number) {
-            const newContractNumber = response.data.contract_number;
-            setValue("contract_number", newContractNumber);
-            toast.success(`${t("newNumberSuggested")}: ${newContractNumber}`);
-            toast(
-              t("pleaseSubmitAgain"),
-            );
-          } else {
-            toast.error(errorMessage);
-          }
-        } catch (retryError) {
-          toast.error(errorMessage);
+          return;
         }
-      } else {
-        toast.error(errorMessage);
+
+        const fresh = await fetchNextContractNumber(Number(data.group_id));
+        if (fresh && fresh !== sentNumber) {
+          setValue("contract_number", fresh);
+          toast.error(
+            t("contractNumberTakenNewAssigned")
+              .replace("{{old}}", sentNumber)
+              .replace("{{number}}", fresh),
+            { duration: 8000 },
+          );
+        } else {
+          // The server offers the very number it just rejected — a backend
+          // numbering fault. Point staff to manual entry.
+          toast.error(
+            t("contractNumberServerConflict").replace("{{number}}", sentNumber),
+            { duration: 10000 },
+          );
+        }
+        return;
       }
+
+      toast.error(
+        status && status >= 500 ? t("errorServerError") : errorMessage,
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
+    <>
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
@@ -810,22 +906,69 @@ export function StudentWithContractDialog({
                 <Label className="text-green-700 font-semibold">
                   {t("contractNumber")} *
                 </Label>
-                {/* Contract number is a frozen, never-reused serial. It is
-                    assigned automatically from the group — there is no choice
-                    to make, so the field is read-only. */}
-                <Input
-                  {...register("contract_number", { required: true })}
-                  readOnly
-                  aria-readonly="true"
-                  tabIndex={-1}
-                  placeholder={
-                    selectedGroupId ? "" : t("selectGroup")
-                  }
-                  className="border-green-300 bg-muted/50 cursor-not-allowed font-mono focus:border-green-300 focus-visible:ring-0"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t("contractNumberFrozenHint")}
-                </p>
+                {/* Assigned automatically from the group. Clicking the field
+                    asks for confirmation before it becomes editable — the
+                    number is what families pay against, so it must not be
+                    changed by accident. */}
+                <div className="relative">
+                  <Input
+                    {...register("contract_number", { required: true })}
+                    readOnly={!isNumberManual}
+                    aria-readonly={!isNumberManual}
+                    placeholder={selectedGroupId ? "" : t("selectGroup")}
+                    onClick={() => {
+                      if (!isNumberManual && selectedGroupId) {
+                        setShowManualConfirm(true);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (
+                        !isNumberManual &&
+                        selectedGroupId &&
+                        (e.key === "Enter" || e.key === " ")
+                      ) {
+                        e.preventDefault();
+                        setShowManualConfirm(true);
+                      }
+                    }}
+                    className={
+                      isNumberManual
+                        ? "pr-10 font-mono border-amber-400 focus-visible:ring-amber-300"
+                        : "pr-10 font-mono border-green-300 bg-muted/50 cursor-pointer focus:border-green-300 focus-visible:ring-0"
+                    }
+                  />
+                  {!isNumberManual && selectedGroupId && (
+                    <button
+                      type="button"
+                      onClick={() => setShowManualConfirm(true)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      title={t("editContractNumberManually")}
+                      aria-label={t("editContractNumberManually")}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                {isNumberManual ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-1">
+                    <p className="flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      {t("contractNumberManualHint")}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void handleRestoreAutoNumber()}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      {t("restoreAutoContractNumber")}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t("contractNumberAutoHint")}
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
                 <Label>{t("studentFullName")} *</Label>
@@ -1249,5 +1392,62 @@ export function StudentWithContractDialog({
         )}
       </DialogContent>
     </Dialog>
+
+    {/* Confirm before the auto-assigned contract number becomes editable.
+        Rendered beside the form dialog (not inside it) so it always sits
+        on top, centred on the screen. */}
+    {open && showManualConfirm && (
+      <div
+        className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/50 p-4"
+        onClick={() => setShowManualConfirm(false)}
+      >
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="manual-contract-number-title"
+          className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 rounded-full bg-amber-100 p-2 dark:bg-amber-900/30">
+              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="space-y-2">
+              <h3
+                id="manual-contract-number-title"
+                className="text-lg font-semibold text-foreground"
+              >
+                {t("manualContractNumberTitle")}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {t("manualContractNumberBody").replace(
+                  "{{number}}",
+                  String(getValues("contract_number") || "—"),
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="mt-6 flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowManualConfirm(false)}
+              autoFocus
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmManualNumber}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              <Pencil className="w-4 h-4 mr-2" />
+              {t("editContractNumberManually")}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
