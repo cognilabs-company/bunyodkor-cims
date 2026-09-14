@@ -126,10 +126,8 @@ export function StudentWithContractDialog({
   const { t } = useLanguageStore();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Numbers are a never-reused running serial: there is no gap list to pick
-  // from. The group's own capacity is display-only and blocks nothing — the
-  // enrolment cap lives on the birth year (see `isYearFull` below).
-  const [isGroupFull, setIsGroupFull] = useState(false);
+  // Group capacity blocks nothing (the backend's `is_full` is always false);
+  // the only enrolment cap is the birth-year limit — see `isYearFull` below.
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -224,22 +222,16 @@ export function StudentWithContractDialog({
           if (!selectedGroup) return;
 
           // The next serial is the only valid contract number — assign it and
-          // display it read-only. `is_full` is a headcount check, independent
-          // of numbering (a full group still returns a valid next number).
+          // display it read-only.
           const response = await contractService.getNextAvailableNumber(
             Number(selectedGroupId),
           );
 
           const contractNumber = response.data.contract_number || "";
           setValue("contract_number", contractNumber);
-          // Informational only: a group over its display capacity still accepts
-          // enrolments. Only the birth-year limit can block one.
-          setIsGroupFull(Boolean(response.data.is_full));
         } catch (error) {
           console.error("Shartnoma raqami xatosi:", error);
         }
-      } else {
-        setIsGroupFull(false);
       }
     };
     fetchContractNumber();
@@ -833,11 +825,6 @@ export function StudentWithContractDialog({
                 <p className="text-xs text-muted-foreground mt-1">
                   {t("contractNumberFrozenHint")}
                 </p>
-                {isGroupFull && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t("groupCapacityFullInfo")}
-                  </p>
-                )}
               </div>
               <div className="space-y-1">
                 <Label>{t("studentFullName")} *</Label>

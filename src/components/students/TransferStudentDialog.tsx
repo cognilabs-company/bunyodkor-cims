@@ -90,30 +90,19 @@ export function TransferStudentDialog({
     enabled: open,
   });
 
-  // Groups at capacity (active contracts headcount >= capacity). Used as a
-  // disabling hint; the backend 409 remains the source of truth.
-  const fullGroupIds = useMemo(() => {
-    const set = new Set<number>();
-    (groups || []).forEach((g: GroupRead) => {
-      const used = g.active_students_count ?? g.current_student_count ?? 0;
-      if (typeof g.capacity === "number" && g.capacity > 0 && used >= g.capacity) {
-        set.add(g.id);
-      }
-    });
-    return set;
-  }, [groups]);
-
+  // Every group is a valid target. Group capacity no longer limits anything,
+  // and a transfer keeps the contract and its birth year, so the year limit
+  // does not apply either. The backend never answers "group full" here.
   const groupOptions = useMemo(
     () =>
       (groups || [])
         // Exclude the student's current group.
         .filter((g: GroupRead) => g.id !== currentGroupId)
         .map((g: GroupRead) => {
-          const isFull = fullGroupIds.has(g.id);
           const baseLabel = formatGroupSelectLabel(g) || g.name || `#${g.id}`;
           return {
             value: String(g.id),
-            label: isFull ? `${baseLabel} — ${t("capacityFull")}` : baseLabel,
+            label: baseLabel,
             keywords: [
               g.name,
               g.birth_year,
@@ -125,11 +114,8 @@ export function TransferStudentDialog({
               .map(String),
           };
         }),
-    [groups, currentGroupId, fullGroupIds, t],
+    [groups, currentGroupId],
   );
-
-  const selectedIsFull =
-    targetGroupId !== "" && fullGroupIds.has(Number(targetGroupId));
 
   const transferMutation = useMutation({
     mutationFn: () =>
@@ -168,10 +154,6 @@ export function TransferStudentDialog({
   const handleConfirm = () => {
     if (!targetGroupId) {
       toast.error(t("selectTargetGroup"));
-      return;
-    }
-    if (selectedIsFull) {
-      toast.error(t("groupIsFull"));
       return;
     }
     transferMutation.mutate();
@@ -217,11 +199,6 @@ export function TransferStudentDialog({
               contentClassName="z-[10020]"
               disabled={isLoadingGroups}
             />
-            {selectedIsFull && (
-              <p className="text-xs font-medium text-red-600 dark:text-red-400">
-                {t("groupIsFull")}
-              </p>
-            )}
           </div>
 
           <div className="space-y-1">
@@ -248,7 +225,6 @@ export function TransferStudentDialog({
             disabled={
               transferMutation.isPending ||
               !targetGroupId ||
-              selectedIsFull ||
               isLoadingGroups
             }
           >

@@ -290,6 +290,12 @@ export interface GroupRead {
   created_at: string;
   active_students_count: number;
   waiting_list_count: number;
+  /**
+   * Always `false`: group capacity no longer limits enrolment or transfers.
+   * Never block a group on `capacity` / `active_students_count` — the only
+   * enrolment cap is the birth-year limit (`/year-limits`).
+   */
+  is_full?: boolean;
 }
 
 export interface GroupCreateRequest {
@@ -319,7 +325,10 @@ export interface GroupCapacityInfo {
   group_name: string;
   capacity: number;
   active_contracts: number;
+  /** Display only. Can be negative when a group runs over its capacity. */
   available_slots: number;
+  /** Always `false` — capacity is display-only. */
+  is_full?: boolean;
   waiting_list_count: number;
   by_birth_year: Record<string, { used: number; available: number }>;
 }

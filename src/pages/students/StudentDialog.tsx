@@ -138,34 +138,8 @@ export function StudentDialog({
     ).length;
   };
 
-  // Helper function to check if group is full
-  const isGroupFull = (groupId: number): boolean => {
-    const group = groupsList.find((g) => g.id === groupId);
-    if (!group) return false;
-    const studentCount = getGroupStudentCount(groupId);
-    return studentCount >= group.capacity;
-  };
-
   const onSubmit = (data: StudentFormData) => {
-    // Check if we're adding a student to a new group (not editing existing student)
-    const selectedGroupId =
-      data.group_id === "" ||
-      data.group_id === null ||
-      data.group_id === undefined
-        ? null
-        : Number(data.group_id);
-
-    if (selectedGroupId && (!student || student.group_id !== selectedGroupId)) {
-      // Check if the selected group is full
-      if (isGroupFull(selectedGroupId)) {
-        const group = groupsData?.data?.find((g) => g.id === selectedGroupId);
-        toast.error(
-          `${group?.name || "Guruh"} to'lgan! Iltimos, boshqa guruh tanlang.`,
-          { duration: 4000 },
-        );
-        return;
-      }
-    }
+    // No capacity check: group capacity no longer limits who joins a group.
     const payload = {
       ...data,
       group_id:
@@ -311,17 +285,13 @@ export function StudentDialog({
               ) : (
                 <Select id="group_id" {...register("group_id")}>
                   <option value="">{t("selectGroup")}</option>
+                  {/* Every group is selectable: capacity is shown for
+                      reference and never disables a group. */}
                   {groupsList.map((group: GroupRead) => {
                     const studentCount = getGroupStudentCount(group.id);
-                    const isFull = studentCount >= group.capacity;
                     return (
-                      <option
-                        key={group.id}
-                        value={String(group.id)}
-                        disabled={isFull}
-                      >
+                      <option key={group.id} value={String(group.id)}>
                         {formatGroupSelectLabel(group)} ({studentCount}/{group.capacity})
-                        {isFull ? " - To'liq" : ""}
                       </option>
                     );
                   })}

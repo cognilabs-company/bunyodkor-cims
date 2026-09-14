@@ -1111,8 +1111,6 @@
     yearLimitSlotsLeft: "{{count}} places left",
     yearLimitBadge: "{{remaining}} left ({{used}}/{{max}})",
     yearLimitFullBadge: "Year full ({{used}}/{{max}})",
-    groupCapacityFullInfo:
-      "The group is at its listed capacity. This does not block enrolment — only the year limit does.",
   },
 
   uz: {
@@ -2247,8 +2245,6 @@
     yearLimitSlotsLeft: "{{count}} ta joy qoldi",
     yearLimitBadge: "{{remaining}} ta joy ({{used}}/{{max}})",
     yearLimitFullBadge: "Yil to'lgan ({{used}}/{{max}})",
-    groupCapacityFullInfo:
-      "Guruh o'z sig'imiga yetgan. Bu qo'shishni bloklamaydi — faqat yillik limit bloklaydi.",
   },
 
   ru: {
@@ -3340,7 +3336,5 @@
     yearLimitSlotsLeft: "Осталось мест: {{count}}",
     yearLimitBadge: "Осталось {{remaining}} ({{used}}/{{max}})",
     yearLimitFullBadge: "Год заполнен ({{used}}/{{max}})",
-    groupCapacityFullInfo:
-      "Группа достигла своей вместимости. Это не блокирует зачисление — блокирует только годовой лимит.",
   },
 };
