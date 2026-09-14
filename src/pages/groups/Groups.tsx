@@ -683,21 +683,6 @@ export default function Groups() {
                       className="hidden sm:block h-5 w-px bg-border"
                     />
                     <div className="flex flex-wrap items-center gap-1.5">
-                      {canWrite("groups:edit") && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            handleEditYearLimit(yearData.birth_year, yearLimit)
-                          }
-                          aria-label={t("editYearLimit")}
-                          title={t("editYearLimit")}
-                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
                       {yearLimit ? (
                         <>
                           {/* Places left — the figure that matters, in colour. */}
@@ -729,6 +714,22 @@ export default function Groups() {
                         >
                           {t("yearLimitUnlimited")}
                         </Badge>
+                      )}
+                      {/* Edit comes last, after the figures it changes. */}
+                      {canWrite("groups:edit") && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            handleEditYearLimit(yearData.birth_year, yearLimit)
+                          }
+                          aria-label={t("editYearLimit")}
+                          title={t("editYearLimit")}
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
                       )}
                     </div>
 
