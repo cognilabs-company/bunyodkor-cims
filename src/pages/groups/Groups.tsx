@@ -673,45 +673,60 @@ export default function Groups() {
             >
               <Card className="border-border/50 shadow-md">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold text-foreground flex flex-wrap items-center gap-3">
-                    <Calendar className="w-6 h-6" />
-                    {/* Year-wide enrolment limit, ahead of the year itself —
-                        it is the figure that governs the whole section.
-                        The pencil opens the limit editor for this year. */}
-                    {canWrite("groups:edit") && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          handleEditYearLimit(yearData.birth_year, yearLimit)
-                        }
-                        aria-label={t("editYearLimit")}
-                        title={t("editYearLimit")}
-                        className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                    )}
-                    {yearLimit ? (
-                      yearLimit.is_full ? (
-                        <Badge variant="destructive">
-                          {t("yearLimitFullBadge")
-                            .replace("{{used}}", String(yearLimit.current_count))
-                            .replace("{{max}}", String(yearLimit.max_students))}
-                        </Badge>
+                  <CardTitle className="text-xl font-bold text-foreground flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <Calendar className="w-6 h-6 shrink-0" />
+                    <span>
+                      {yearData.birth_year} {t("birthYear") || "yil tug'ilganlar"}
+                    </span>
+
+                    {/* The year's enrolment limit follows the year it belongs
+                        to, set off by a divider. The pencil opens the limit
+                        editor for this year. */}
+                    <span
+                      aria-hidden="true"
+                      className="hidden sm:block h-5 w-px bg-border"
+                    />
+                    <div className="flex items-center gap-1">
+                      {canWrite("groups:edit") && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            handleEditYearLimit(yearData.birth_year, yearLimit)
+                          }
+                          aria-label={t("editYearLimit")}
+                          title={t("editYearLimit")}
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      {yearLimit ? (
+                        yearLimit.is_full ? (
+                          <Badge variant="destructive">
+                            {t("yearLimitFullBadge")
+                              .replace("{{used}}", String(yearLimit.current_count))
+                              .replace("{{max}}", String(yearLimit.max_students))}
+                          </Badge>
+                        ) : (
+                          <Badge variant="default">
+                            {t("yearLimitBadge")
+                              .replace("{{remaining}}", String(yearRemaining))
+                              .replace("{{used}}", String(yearLimit.current_count))
+                              .replace("{{max}}", String(yearLimit.max_students))}
+                          </Badge>
+                        )
                       ) : (
-                        <Badge variant="default">
-                          {t("yearLimitBadge")
-                            .replace("{{remaining}}", String(yearRemaining))
-                            .replace("{{used}}", String(yearLimit.current_count))
-                            .replace("{{max}}", String(yearLimit.max_students))}
+                        <Badge
+                          variant="outline"
+                          className="text-muted-foreground font-medium"
+                        >
+                          {t("yearLimitUnlimited")}
                         </Badge>
-                      )
-                    ) : (
-                      <Badge variant="outline">{t("yearLimitUnlimited")}</Badge>
-                    )}
-                    {yearData.birth_year} {t("birthYear") || "yil tug'ilganlar"}
+                      )}
+                    </div>
+
                     <Badge variant="secondary" className="ml-auto">
                       {yearData.total_groups} {t("group")}
                     </Badge>
