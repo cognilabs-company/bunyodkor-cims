@@ -42,7 +42,7 @@ import { useLanguageStore } from "@/store/languageStore";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePermissions } from "@/hooks/usePermissions";
 import { downloadFile } from "@/lib/export-utils";
-import { compareContracts } from "@/lib/contract-order";
+import { compareContractsNewestFirst } from "@/lib/contract-order";
 import {
   buildSearchEntry,
   matchesSearch,
@@ -244,13 +244,11 @@ export default function Contracts() {
     return map;
   }, [allGroupsData]);
 
-  // Oldest birth year first, then by serial — see lib/contract-order.
+  // Newest contracts first (added today, then yesterday, …) — see
+  // lib/contract-order.
   const indexedContracts = useMemo(() => {
-    const birthYearOf = (contract: ContractWithStudentNameRead) =>
-      contract.birth_year ?? groupById.get(contract.group_id)?.birth_year;
-
     return [...(contractsQuery.data || [])]
-      .sort((a, b) => compareContracts(a, b, birthYearOf))
+      .sort(compareContractsNewestFirst)
       .map((contract) => {
         const group = groupById.get(contract.group_id);
         return {

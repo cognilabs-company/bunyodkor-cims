@@ -1012,7 +1012,7 @@ export const contractService = {
    * Every contract matching the filters, across all pages, with the student's
    * name on each row.
    *
-   * The list screen sorts by birth year and searches by name, both of which
+   * The list screen sorts newest first and searches by name, both of which
    * must see the whole filtered set: sorting or searching one server page of
    * ten would give wrong results.
    *
