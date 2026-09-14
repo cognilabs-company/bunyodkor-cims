@@ -35,7 +35,6 @@ import {
   Trash2,
   Users,
   Calendar,
-  Clock,
   User,
   X,
   Loader2,
@@ -66,10 +65,10 @@ import { formatFullName, formatNameParts } from "@/lib/name-utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { yearLimitKeys } from "@/hooks/useYearLimit";
 
-// Group card: name, coach and schedule only. Headcount and capacity are no
-// longer shown here — enrolment is capped per birth year, and that figure lives
-// on the year heading. Clicking the card opens the group's contracts; every
-// other action sits behind the "⋮" menu next to the name.
+// Group card: name, identifier, coach and headcount. Schedule and capacity are
+// not shown — enrolment is capped per birth year, and that figure lives on the
+// year heading. Clicking the card opens the group's contracts; every other
+// action sits behind the "⋮" menu next to the name.
 function GroupCard({
   group,
   coachName,
@@ -93,26 +92,35 @@ function GroupCard({
         className="hover:shadow-lg transition-all duration-200 cursor-pointer group h-full border-border/50 hover:border-border"
         onClick={onViewContracts}
       >
-        <CardHeader className="pb-3">
+        <CardHeader className={group.description ? "pb-3" : undefined}>
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 shrink-0">
                 <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="min-w-0">
                 <CardTitle className="text-lg group-hover:text-primary transition-colors truncate">
                   {group.name}
                 </CardTitle>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5">
                   {group.identifier && (
                     <Badge variant="outline" className="text-xs">
                       {group.identifier}
                     </Badge>
                   )}
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <User className="w-3 h-3" />
-                    {coachName}
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground min-w-0">
+                    <User className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{coachName}</span>
                   </div>
+                  {/* Headcount beside the coach — capacity no longer governs
+                      enrolment, so the number stands on its own. */}
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary"
+                    title={t("studentsShort")}
+                  >
+                    <UserCheck className="w-3 h-3" />
+                    {group.active_students_count ?? 0} {t("studentsShort")}
+                  </span>
                 </div>
               </div>
             </div>
@@ -124,30 +132,13 @@ function GroupCard({
             />
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              <span className="text-foreground">{group.schedule_days}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              <span className="text-foreground">{group.schedule_time}</span>
-            </div>
-            {/* Headcount only — capacity no longer governs enrolment. */}
-            <div className="flex items-center gap-2 text-sm">
-              <UserCheck className="w-4 h-4 text-muted-foreground" />
-              <span className="text-foreground">
-                {group.active_students_count ?? 0} {t("studentsShort")}
-              </span>
-            </div>
-          </div>
-          {group.description && (
+        {group.description && (
+          <CardContent>
             <p className="text-sm text-muted-foreground line-clamp-2">
               {group.description}
             </p>
-          )}
-        </CardContent>
+          </CardContent>
+        )}
       </Card>
     </motion.div>
   );
@@ -211,9 +202,14 @@ export default function Groups() {
   const getFilteredGroupedData = () => {
     if (!groupedData?.data) return [];
 
-    if (!debouncedSearch) return groupedData.data;
+    // Birth years run oldest first: 2008, 2009, 2010, …
+    const byYear = [...groupedData.data].sort(
+      (a, b) => a.birth_year - b.birth_year,
+    );
 
-    return groupedData.data
+    if (!debouncedSearch) return byYear;
+
+    return byYear
       .map((yearData) => ({
         ...yearData,
         groups: yearData.groups.filter((group) =>

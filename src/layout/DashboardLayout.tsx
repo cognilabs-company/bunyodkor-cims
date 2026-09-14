@@ -90,16 +90,16 @@ const DashboardLayout = () => {
       permission: "groups:view",
     },
     {
-      path: "/year-limits",
-      label: t("yearLimits"),
-      icon: CalendarRange,
-      permission: "groups:view",
-    },
-    {
       path: "/contracts",
       label: t("contracts"),
       icon: FileText,
       permission: "contracts:view",
+    },
+    {
+      path: "/year-limits",
+      label: t("yearLimits"),
+      icon: CalendarRange,
+      permission: "groups:view",
     },
     {
       path: "/finance",
