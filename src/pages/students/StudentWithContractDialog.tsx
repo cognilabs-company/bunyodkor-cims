@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -13,12 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DatePicker } from "@/components/ui/date-picker";
 import toast from "react-hot-toast";
 import {
   studentService,
   groupService,
   contractService,
+  fetchAllPages,
 } from "@/services/api.service";
 import type { GroupRead } from "@/types/api";
 import { useLanguageStore } from "@/store/languageStore";
@@ -32,6 +34,7 @@ import {
   AlertTriangle,
   Pencil,
   RotateCcw,
+  X,
 } from "lucide-react";
 
 // openPdfUrl funksiyasini ishlatamiz
@@ -154,6 +157,7 @@ export function StudentWithContractDialog({
     setValue,
     getValues,
     setFocus,
+    control,
     formState: { errors },
   } = useForm<StudentFormData>({
     defaultValues: {
@@ -179,11 +183,47 @@ export function StudentWithContractDialog({
   const momFio = watch("mom_fio");
   const momPhone = watch("mom_phone");
 
+  // Every group, not just the first page: with more than 100 groups the rest
+  // silently never appeared in the picker.
   const { data: groupsData } = useQuery({
-    queryKey: ["groups-list"],
-    queryFn: () => groupService.getGroups({ page: 1, page_size: 100 }),
+    queryKey: ["groups-list", "student-with-contract"],
+    queryFn: async () => ({
+      data: await fetchAllPages((page, page_size) =>
+        groupService.getGroups({ page, page_size }),
+      ),
+    }),
     enabled: open,
   });
+
+  // Oldest birth year first (2008, 2009, …), then by group name, listed under a
+  // heading per year.
+  const groupOptions = useMemo(
+    () =>
+      [...(groupsData?.data || [])]
+        .sort(
+          (a: GroupRead, b: GroupRead) =>
+            (Number(a.birth_year) || 0) - (Number(b.birth_year) || 0) ||
+            String(a.name || a.identifier).localeCompare(
+              String(b.name || b.identifier),
+              undefined,
+              { numeric: true },
+            ),
+        )
+        .map((group: GroupRead) => {
+          const coach = [group.coach_last_name, group.coach_first_name]
+            .filter(Boolean)
+            .join(" ");
+          return {
+            value: String(group.id),
+            label: group.name || group.identifier || `#${group.id}`,
+            description: coach || undefined,
+            section: group.birth_year ? String(group.birth_year) : undefined,
+            selectedLabel: formatGroupSelectLabel(group),
+            keywords: [group.identifier, String(group.birth_year ?? "")],
+          };
+        }),
+    [groupsData],
+  );
 
   // Enrolment is capped per BIRTH YEAR across every group, so the limit that
   // decides whether this student can be enrolled hangs off the selected group's
@@ -418,7 +458,7 @@ export function StudentWithContractDialog({
         first_name: "",
         last_name: "",
         date_of_birth: "",
-        phone: "",
+        phone: "+998",
         address: "",
         status: "active",
         group_id: "",
@@ -427,10 +467,10 @@ export function StudentWithContractDialog({
         birth_year: "",
         student_address: "",
         dad_name: "",
-        dad_phone: "",
+        dad_phone: "+998",
         dad_occupation: "",
         mom_fio: "",
-        mom_phone: "",
+        mom_phone: "+998",
         mom_occupation: "",
         contract_start_date: today,
         contract_end_date: endOfYear,
@@ -468,6 +508,10 @@ export function StudentWithContractDialog({
       await new Promise((resolve) => setTimeout(resolve, duration / steps));
       setLoadingProgress(Math.min(startProgress + increment * i, endProgress));
     }
+  };
+
+  const onInvalid = () => {
+    toast.error(t("fillAllRequiredFields"));
   };
 
   const onSubmit = async (data: StudentFormData) => {
@@ -750,6 +794,34 @@ export function StudentWithContractDialog({
     }
   };
 
+  // Date fields use the app's calendar instead of the browser date input.
+  // Values stay "yyyy-MM-dd" strings, exactly what the form sent before.
+  const renderDateField = (
+    name:
+      | "date_of_birth"
+      | "tarbiyalanuvchi_when_give"
+      | "contract_start_date"
+      | "contract_end_date"
+      | "buyurtmachi_when_give",
+    options: { required?: boolean; fromYear?: number; toYear?: number } = {},
+  ) => (
+    <Controller
+      control={control}
+      name={name}
+      rules={{ required: options.required }}
+      render={({ field, fieldState }) => (
+        <DatePicker
+          value={typeof field.value === "string" ? field.value : ""}
+          onChange={field.onChange}
+          onBlur={field.onBlur}
+          invalid={Boolean(fieldState.error)}
+          fromYear={options.fromYear}
+          toYear={options.toYear}
+        />
+      )}
+    />
+  );
+
   return (
     <>
     <Dialog
@@ -757,25 +829,46 @@ export function StudentWithContractDialog({
       onOpenChange={onOpenChange}
       closeOnOverlayClick={false}
     >
-      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto border-2 border-primary/20 pb-10 pl-10">
-        <DialogHeader>
-          <DialogTitle className="text-2xl flex items-center gap-2">
-            <UserPlus className="w-6 h-6" />
-            {t("createStudentAndContract")}
-          </DialogTitle>
-          <DialogDescription>
-            {t("fillAllFieldsDocsRequired")}
-          </DialogDescription>
+      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto border-2 border-primary/20">
+        {/* Stays at the top while the long form scrolls, so closing is always
+            one click away. */}
+        <DialogHeader className="sticky top-0 z-20 border-b border-border bg-card/95 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 space-y-1">
+              <DialogTitle className="text-xl sm:text-2xl flex items-center gap-2">
+                <UserPlus className="w-6 h-6 shrink-0 text-primary" />
+                {t("createStudentAndContract")}
+              </DialogTitle>
+              <DialogDescription className="mt-1">
+                {t("fillAllFieldsDocsRequired")}
+              </DialogDescription>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isSubmitting) handleClose();
+              }}
+              disabled={isSubmitting}
+              aria-label={t("close")}
+              title={t("close")}
+              className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:pointer-events-none disabled:opacity-40"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pt-4">
+        <form
+          onSubmit={handleSubmit(onSubmit, onInvalid)}
+          className="space-y-6 px-6 pt-6"
+        >
           {/* FORM QISMI O'ZGARISHSIZ QOLDI */}
           {/* ... Inputlar va Fayl yuklash qismlari sizdagi koddagi kabi ... */}
 
           {/* TIZIM MA'LUMOTLARI */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="space-y-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200">
-              <h3 className="font-bold text-blue-800 dark:text-blue-200 text-lg border-b border-blue-200 pb-2 mb-4">
+            <div className="space-y-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/60">
+              <h3 className="font-bold text-blue-800 dark:text-blue-200 text-lg border-b border-blue-200 dark:border-blue-900/60 pb-2 mb-4">
                 1. {t("systemStudentInfo")}
               </h3>
               {/* ... System inputs ... */}
@@ -803,10 +896,11 @@ export function StudentWithContractDialog({
                 </div>
                 <div className="space-y-1">
                   <Label>{t("dateOfBirth")} *</Label>
-                  <Input
-                    type="date"
-                    {...register("date_of_birth", { required: true })}
-                  />
+                  {renderDateField("date_of_birth", {
+                    required: true,
+                    fromYear: 1990,
+                    toYear: new Date().getFullYear(),
+                  })}
                 </div>
                 <div className="space-y-1">
                   <Label>{t("phoneNumber")} *</Label>
@@ -829,23 +923,24 @@ export function StudentWithContractDialog({
                 </div>
                 <div className="space-y-1">
                   <Label>{t("group")} *</Label>
-                  <Select
-                    {...register("group_id", { required: true })}
-                    className="h-10"
-                  >
-                    <option value="">{t("selectGroupPlaceholder")}</option>
-                    {[...(groupsData?.data || [])]
-                      .sort((a: GroupRead, b: GroupRead) => {
-                        const ya = Number((a as any).birth_year) || 0;
-                        const yb = Number((b as any).birth_year) || 0;
-                        return yb - ya;
-                      })
-                      .map((group: GroupRead) => (
-                        <option key={group.id} value={String(group.id)}>
-                          {formatGroupSelectLabel(group)}
-                        </option>
-                      ))}
-                  </Select>
+                  <Controller
+                    control={control}
+                    name="group_id"
+                    rules={{ required: true }}
+                    render={({ field, fieldState }) => (
+                      <SearchableSelect
+                        value={field.value ? String(field.value) : ""}
+                        onValueChange={field.onChange}
+                        options={groupOptions}
+                        placeholder={t("selectGroupPlaceholder")}
+                        searchPlaceholder={`${t("search")}...`}
+                        emptyText={t("noDataFound")}
+                        invalid={Boolean(fieldState.error)}
+                        triggerClassName="h-9"
+                        contentClassName="z-[10030]"
+                      />
+                    )}
+                  />
                   {/* Places left in the group's birth year — this, not the
                       group's capacity, is what can block the enrolment. */}
                   <YearLimitNotice birthYear={selectedGroupBirthYear} />
@@ -853,8 +948,8 @@ export function StudentWithContractDialog({
               </div>
             </div>
 
-            <div className="space-y-4 p-4 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200">
-              <h3 className="font-bold text-purple-800 dark:text-purple-200 text-lg border-b border-purple-200 pb-2 mb-4">
+            <div className="space-y-4 p-4 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/60">
+              <h3 className="font-bold text-purple-800 dark:text-purple-200 text-lg border-b border-purple-200 dark:border-purple-900/60 pb-2 mb-4">
                 {t("traineeDocuments")}
               </h3>
               <div className="space-y-3">
@@ -880,10 +975,10 @@ export function StudentWithContractDialog({
                 </div>
                 <div>
                   <Label>{t("issuedDate")}</Label>
-                  <Input
-                    type="date"
-                    {...register("tarbiyalanuvchi_when_give")}
-                  />
+                  {renderDateField("tarbiyalanuvchi_when_give", {
+                    fromYear: 1990,
+                    toYear: new Date().getFullYear(),
+                  })}
                 </div>
                 <div>
                   <Label>{t("issuedBy")}</Label>
@@ -896,14 +991,14 @@ export function StudentWithContractDialog({
             </div>
           </div>
 
-          <div className="space-y-4 p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200">
-            <h3 className="font-bold text-green-800 dark:text-green-200 text-lg border-b border-green-200 pb-2 mb-4">
+          <div className="space-y-4 p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/60">
+            <h3 className="font-bold text-green-800 dark:text-green-200 text-lg border-b border-green-200 dark:border-green-900/60 pb-2 mb-4">
               2. {t("contractInfoForPDF")}
             </h3>
             {/* ... Contract inputs ... */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="col-span-1 md:col-span-2 space-y-1">
-                <Label className="text-green-700 font-semibold">
+                <Label className="text-green-700 dark:text-green-300 font-semibold">
                   {t("contractNumber")} *
                 </Label>
                 {/* Assigned automatically from the group. Clicking the field
@@ -1005,17 +1100,11 @@ export function StudentWithContractDialog({
               </div>
               <div className="space-y-1">
                 <Label>{t("startDate")} *</Label>
-                <Input
-                  type="date"
-                  {...register("contract_start_date", { required: true })}
-                />
+                {renderDateField("contract_start_date", { required: true })}
               </div>
               <div className="space-y-1">
                 <Label>{t("endDate")} *</Label>
-                <Input
-                  type="date"
-                  {...register("contract_end_date", { required: true })}
-                />
+                {renderDateField("contract_end_date", { required: true })}
               </div>
               <div className="space-y-1">
                 <Label>{t("monthlyFee")} (UZS) *</Label>
@@ -1034,10 +1123,10 @@ export function StudentWithContractDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-green-200 pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-green-200 dark:border-green-900/60 pt-6">
               {/* Ota/Ona ma'lumotlari */}
-              <div className="space-y-4 p-4 bg-white/60 dark:bg-black/20 rounded-lg border border-green-100 shadow-sm">
-                <h4 className="font-bold text-gray-700 flex items-center gap-2">
+              <div className="space-y-4 p-4 bg-white/60 dark:bg-black/20 rounded-lg border border-green-100 dark:border-green-900/40 shadow-sm">
+                <h4 className="font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
                   <UserPlus className="w-4 h-4" /> {t("fatherInfo")}
                 </h4>
                 <div className="space-y-2">
@@ -1065,8 +1154,8 @@ export function StudentWithContractDialog({
                   />
                 </div>
               </div>
-              <div className="space-y-4 p-4 bg-white/60 dark:bg-black/20 rounded-lg border border-green-100 shadow-sm">
-                <h4 className="font-bold text-gray-700 flex items-center gap-2">
+              <div className="space-y-4 p-4 bg-white/60 dark:bg-black/20 rounded-lg border border-green-100 dark:border-green-900/40 shadow-sm">
+                <h4 className="font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
                   <UserPlus className="w-4 h-4" /> {t("motherInfo")}
                 </h4>
                 <div className="space-y-2">
@@ -1096,25 +1185,28 @@ export function StudentWithContractDialog({
               </div>
             </div>
 
-            <div className="border-t border-green-200 pt-6 mt-4">
+            <div className="border-t border-green-200 dark:border-green-900/60 pt-6 mt-4">
               <div className="space-y-3">
-                <h4 className="font-semibold mb-2 text-green-800">
+                <h4 className="font-semibold mb-2 text-green-800 dark:text-green-200">
                   {t("customer")}
                 </h4>
                 <div className="space-y-2">
                   <div>
                     <Label>{t("customerType")} *</Label>
-                    <Select
+                    <SearchableSelect
                       value={customerType}
-                      onChange={(e) =>
-                        handleCustomerTypeChange(e.target.value as any)
+                      onValueChange={(value) =>
+                        handleCustomerTypeChange(value as any)
                       }
-                      className="h-10"
-                    >
-                      <option value="father">{t("father")}</option>
-                      <option value="mother">{t("mother")}</option>
-                      <option value="other">{t("other")}</option>
-                    </Select>
+                      options={[
+                        { value: "father", label: t("father") },
+                        { value: "mother", label: t("mother") },
+                        { value: "other", label: t("other") },
+                      ]}
+                      searchable={false}
+                      triggerClassName="h-9"
+                      contentClassName="z-[10030]"
+                    />
                   </div>
                   <div>
                     <Label>{t("fullName")} *</Label>
@@ -1166,7 +1258,10 @@ export function StudentWithContractDialog({
                   </div>
                   <div>
                     <Label>{t("issuedDate")}</Label>
-                    <Input type="date" {...register("buyurtmachi_when_give")} />
+                    {renderDateField("buyurtmachi_when_give", {
+                      fromYear: 1950,
+                      toYear: new Date().getFullYear(),
+                    })}
                   </div>
                   <div>
                     <Label>{t("issuedBy")}</Label>
@@ -1180,8 +1275,8 @@ export function StudentWithContractDialog({
             </div>
           </div>
 
-          <div className="space-y-4 p-4 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200">
-            <h3 className="font-bold text-orange-800 dark:text-orange-200 text-lg border-b border-orange-200 pb-2 mb-4">
+          <div className="space-y-4 p-4 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/60">
+            <h3 className="font-bold text-orange-800 dark:text-orange-200 text-lg border-b border-orange-200 dark:border-orange-900/60 pb-2 mb-4">
               3. {t("documents")}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1236,7 +1331,7 @@ export function StudentWithContractDialog({
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 pt-4 border-t sticky bottom-0 bg-white dark:bg-slate-900 p-4 shadow-lg border-t-gray-200">
+          <div className="sticky bottom-0 z-20 -mx-6 flex flex-col gap-3 border-t border-border bg-card/95 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-card/80">
             {isYearFull && (
               <p className="text-sm font-medium text-red-600 dark:text-red-400">
                 {t("yearLimitReachedShort").replace(
