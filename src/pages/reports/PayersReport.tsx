@@ -18,6 +18,7 @@ import {
   TableEmpty,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui/select";
 import { reportService, groupService, studentService } from "@/services/api.service";
 import { useLanguageStore } from "@/store/languageStore";
 import { format, startOfMonth, endOfMonth } from "date-fns";
@@ -234,13 +235,13 @@ const PayersReport: FC = () => {
               <label className="text-sm font-medium text-foreground mb-1 block">
                 {t("paymentYear")}
               </label>
-              <select
+              <Select
                 value={paymentYear}
                 onChange={(e) => {
                   setPaymentYear(e.target.value ? Number(e.target.value) : "");
                   setPage(1);
                 }}
-                className="flex h-10 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-10 w-40"
               >
                 {[
                   currentYear - 2,
@@ -253,20 +254,20 @@ const PayersReport: FC = () => {
                   </option>
                 ))}
                 <option value="">{t("allYears")}</option>
-              </select>
+              </Select>
             </div>
 
             <div>
               <label className="text-sm font-medium text-foreground mb-1 block">
                 {t("month") || "Month"}
               </label>
-              <select
+              <Select
                 value={paymentMonth}
                 onChange={(e) => {
                   setPaymentMonth(e.target.value ? Number(e.target.value) : "");
                   setPage(1);
                 }}
-                className="flex h-10 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-10 w-40"
               >
                 <option value="">{t("allMonths") || "All months"}</option>
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
@@ -274,7 +275,7 @@ const PayersReport: FC = () => {
                     {m}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div className="w-full sm:w-[22rem] lg:w-[26rem]">

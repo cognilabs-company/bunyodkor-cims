@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import toast from "react-hot-toast";
 import {
   studentService,
@@ -732,9 +733,9 @@ export function StudentWithContractDialog({
                 </div>
                 <div className="space-y-1">
                   <Label>{t("group")} *</Label>
-                  <select
+                  <Select
                     {...register("group_id", { required: true })}
-                    className="h-10 w-full rounded-md border border-input bg-background px-3"
+                    className="h-10"
                   >
                     <option value="">{t("selectGroupPlaceholder")}</option>
                     {[...(groupsData?.data || [])]
@@ -748,7 +749,7 @@ export function StudentWithContractDialog({
                           {formatGroupSelectLabel(group)}
                         </option>
                       ))}
-                  </select>
+                  </Select>
                   {/* Places left in the group's birth year — this, not the
                       group's capacity, is what can block the enrolment. */}
                   <YearLimitNotice birthYear={selectedGroupBirthYear} />
@@ -960,17 +961,17 @@ export function StudentWithContractDialog({
                 <div className="space-y-2">
                   <div>
                     <Label>{t("customerType")} *</Label>
-                    <select
+                    <Select
                       value={customerType}
                       onChange={(e) =>
                         handleCustomerTypeChange(e.target.value as any)
                       }
-                      className="h-10 w-full rounded-md border border-input bg-background px-3"
+                      className="h-10"
                     >
                       <option value="father">{t("father")}</option>
                       <option value="mother">{t("mother")}</option>
                       <option value="other">{t("other")}</option>
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <Label>{t("fullName")} *</Label>
