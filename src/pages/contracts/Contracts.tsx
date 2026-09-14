@@ -36,6 +36,7 @@ import {
   groupService,
   reportService,
   studentService,
+  userService,
 } from "@/services/api.service";
 import { useGroupsStore } from "@/store/groupsStore";
 import { useLanguageStore } from "@/store/languageStore";
@@ -231,6 +232,28 @@ export default function Contracts() {
     } finally {
       setOpeningStudentFor(null);
     }
+  };
+
+  // Terminated rows carry no coach, so it is looked up through the row's group:
+  // the coaches list first (as the Groups page does), then the names the
+  // group itself may carry.
+  const { data: coachesData } = useQuery({
+    queryKey: ["coaches"],
+    queryFn: () => userService.getCoaches({}),
+    enabled: view !== "contracts",
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const getCoachNameForGroup = (groupId?: number | null) => {
+    if (!groupId) return "-";
+    const group: any = groupById.get(groupId);
+    if (!group) return "-";
+    const coach = coachesData?.data?.find((c) => c.id === group.coach_id);
+    return (
+      formatFullName(coach?.full_name) ||
+      formatNameParts(group.coach_last_name, group.coach_first_name) ||
+      "-"
+    );
   };
 
   // group_id → group, for the group name and birth year of each contract.
@@ -614,21 +637,13 @@ export default function Contracts() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-sm text-muted-foreground">{t("terminatedCount") || "Terminated"}</CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
                 <p className="text-2xl font-bold">{terminatedSummaryQuery.data.data.terminated_count}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-sm text-muted-foreground">{t("totalDebt") || "Total Debt"}</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <p className="text-2xl font-bold text-red-600">{formatCurrency(terminatedSummaryQuery.data.data.total_debt)}</p>
               </CardContent>
             </Card>
             <Card>
@@ -874,7 +889,7 @@ export default function Contracts() {
                       <>
                         <TableHead>{t("group")}</TableHead>
                         <TableHead>{t("terminatedAt")}</TableHead>
-                        <TableHead>{t("paymentsTotal")}</TableHead>
+                        <TableHead>{t("coach")}</TableHead>
                         <TableHead>{t("reason") || "Reason"}</TableHead>
                         <TableHead className="text-right [&>div]:justify-end">
                           {t("actions")}
@@ -886,7 +901,7 @@ export default function Contracts() {
                         <TableHead>{t("terminatedAt")}</TableHead>
                         <TableHead>{t("paid") || "Paid"}</TableHead>
                         <TableHead>{t("unpaid") || "Unpaid"}</TableHead>
-                        <TableHead>{t("debt") || "Debt"}</TableHead>
+                        <TableHead>{t("coach")}</TableHead>
                       </>
                     )}
                   </TableRow>
@@ -1043,7 +1058,7 @@ export default function Contracts() {
                                   : "-"}
                               </TableCell>
                               <TableCell>
-                                {formatCurrency(item.successful_payments_total)}
+                                {getCoachNameForGroup(item.student_group_id)}
                               </TableCell>
                               <TableCell>{item.termination_reason || "-"}</TableCell>
                               <TableCell className="text-right">
@@ -1138,10 +1153,10 @@ export default function Contracts() {
                                       </div>
                                       <div>
                                         <p className="text-muted-foreground">
-                                          {t("paymentsTotal")}
+                                          {t("coach")}
                                         </p>
                                         <p className="font-medium">
-                                          {formatCurrency(item.successful_payments_total)}
+                                          {getCoachNameForGroup(item.student_group_id)}
                                         </p>
                                       </div>
                                       <div>
@@ -1270,7 +1285,11 @@ export default function Contracts() {
                         </TableCell>
                         <TableCell>{item.paid_months_count}</TableCell>
                         <TableCell>{item.unpaid_months_count}</TableCell>
-                        <TableCell>{formatCurrency(item.debt_amount)}</TableCell>
+                        <TableCell>
+                          {getCoachNameForGroup(
+                            item.contract_group_id ?? item.current_student_group_id,
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
