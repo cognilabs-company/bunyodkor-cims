@@ -911,29 +911,41 @@ export const groupService = {
 /**
  * Collects every row of a paginated list endpoint.
  *
- * Asks for 100 rows a page and falls back to 20 if the endpoint rejects that
- * size (422). Remaining pages are requested a few at a time rather than all at
- * once, to stay gentle on the API.
+ * Fewer, larger pages are much faster than many small ones, so it asks for
+ * 1000 rows a page first and steps down to 100, then 20, only if the endpoint
+ * rejects the size (422 — logged, not toasted, by the response interceptor).
+ * Remaining pages go out six at a time: the browser's per-host limit, so none
+ * sit queued, while the API is never flooded.
+ *
+ * `onProgress(loaded, total)` fires after every page, for a progress readout.
  */
-async function fetchAllPages<T>(
+export async function fetchAllPages<T>(
   fetchPage: (page: number, pageSize: number) => Promise<ApiResponse<T[]>>,
+  onProgress?: (loaded: number, total: number) => void,
 ): Promise<T[]> {
-  const CONCURRENCY = 4;
-  let pageSize = 100;
-  let first: ApiResponse<T[]>;
+  const PAGE_SIZES = [1000, 100, 20];
+  const CONCURRENCY = 6;
 
-  try {
-    first = await fetchPage(1, pageSize);
-  } catch (error) {
-    const status = (error as { response?: { status?: number } })?.response
-      ?.status;
-    if (status !== 422) throw error;
-    pageSize = 20;
-    first = await fetchPage(1, pageSize);
+  let pageSize = PAGE_SIZES[0];
+  let first: ApiResponse<T[]> | undefined;
+
+  for (const size of PAGE_SIZES) {
+    try {
+      pageSize = size;
+      first = await fetchPage(1, size);
+      break;
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response
+        ?.status;
+      const isLastSize = size === PAGE_SIZES[PAGE_SIZES.length - 1];
+      if (status !== 422 || isLastSize) throw error;
+    }
   }
 
-  const rows = [...(first.data || [])];
-  const totalPages = first.meta?.total_pages ?? 1;
+  const rows = [...(first?.data || [])];
+  const totalPages = first?.meta?.total_pages ?? 1;
+  const total = first?.meta?.total ?? rows.length;
+  onProgress?.(rows.length, total);
 
   for (let start = 2; start <= totalPages; start += CONCURRENCY) {
     const batch = Array.from(
@@ -943,6 +955,7 @@ async function fetchAllPages<T>(
     for (const response of await Promise.all(batch)) {
       rows.push(...(response.data || []));
     }
+    onProgress?.(rows.length, total);
   }
 
   return rows;
@@ -997,40 +1010,29 @@ export const contractService = {
 
   /**
    * Every contract matching the filters, across all pages, with the student's
-   * name and `student_id` on each row.
+   * name on each row.
    *
    * The list screen sorts by birth year and searches by name, both of which
    * must see the whole filtered set: sorting or searching one server page of
-   * ten would give wrong results. Pages are fetched a few at a time.
+   * ten would give wrong results.
    *
-   * `/contracts/withname` is the source; `/contracts` is only called too if
-   * the rows arrive without `student_id`, to fill it in.
+   * Only `/contracts/withname` is read. Rows may lack `student_id`; the screen
+   * looks it up for the one contract a user clicks (`getContract`), instead of
+   * loading the entire list a second time from `/contracts` just to fill it in.
    */
   getAllContractsWithStudentName: async (
     params: Omit<GetContractsWithStudentNameParams, "page" | "page_size">,
-  ): Promise<ContractWithStudentNameRead[]> => {
-    const rows = await fetchAllPages((page, page_size) =>
-      contractService.getContractsWithStudentName({
-        ...params,
-        page,
-        page_size,
-      }),
-    );
-
-    if (rows.every((row) => row.student_id != null)) return rows;
-
-    const standard = await fetchAllPages((page, page_size) =>
-      contractService.getContracts({ ...params, page, page_size }),
-    );
-    const studentIdByContract = new Map(
-      standard.map((contract) => [contract.id, contract.student_id]),
-    );
-
-    return rows.map((row) => ({
-      ...row,
-      student_id: row.student_id ?? studentIdByContract.get(row.id)!,
-    }));
-  },
+    onProgress?: (loaded: number, total: number) => void,
+  ): Promise<ContractWithStudentNameRead[]> =>
+    fetchAllPages(
+      (page, page_size) =>
+        contractService.getContractsWithStudentName({
+          ...params,
+          page,
+          page_size,
+        }),
+      onProgress,
+    ),
 
   /**
    * Get all contracts with optional filters
@@ -2067,6 +2069,29 @@ export const reportService = {
       "/reports/payers",
       { params },
     );
+    return response.data;
+  },
+
+  /**
+   * Export the payers report (same filters as `getPayers`) to Excel.
+   * GET /reports/payers/export
+   *
+   * Restored: commit 81b7240 replaced this with `exportPaymentsExcel`, but the
+   * Payers report still calls it, so its Export button threw
+   * "exportPayersReport is not a function".
+   */
+  exportPayersReport: async (params?: {
+    payment_year?: number;
+    payment_month?: number;
+    group_id?: number;
+    min_paid_amount?: number;
+    from_date?: string;
+    to_date?: string;
+  }): Promise<Blob> => {
+    const response = await apiClient.get<Blob>("/reports/payers/export", {
+      params,
+      responseType: "blob",
+    });
     return response.data;
   },
 

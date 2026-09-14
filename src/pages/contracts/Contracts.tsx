@@ -34,6 +34,7 @@ import {
 import {
   contractService,
   groupService,
+  reportService,
   studentService,
 } from "@/services/api.service";
 import { useGroupsStore } from "@/store/groupsStore";
@@ -92,9 +93,17 @@ export default function Contracts() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
-  const [groupFilter, setGroupFilter] = useState<number | undefined>(undefined);
+  // Seeded from the URL on first render, so a link with ?group_id= loads the
+  // filtered list once instead of loading everything and then again filtered.
+  const readIdParam = (name: string) => {
+    const value = searchParams.get(name);
+    return value ? parseInt(value, 10) : undefined;
+  };
+  const [groupFilter, setGroupFilter] = useState<number | undefined>(() =>
+    readIdParam("group_id"),
+  );
   const [contractIdFilter, setContractIdFilter] = useState<number | undefined>(
-    undefined,
+    () => readIdParam("contract_id"),
   );
   const [archiveYearFilter, setArchiveYearFilter] = useState<
     number | undefined
@@ -161,17 +170,68 @@ export default function Contracts() {
   // The whole filtered set, loaded once per filter combination. Sorting and
   // searching happen below, in the browser: both need every row, and typing in
   // the search box then costs no network round-trip at all.
+  const [loadProgress, setLoadProgress] = useState<{
+    loaded: number;
+    total: number;
+  } | null>(null);
+
   const contractsQuery = useQuery({
     queryKey: ["contracts", "all", statusFilter, groupFilter, archiveYearFilter],
-    queryFn: () =>
-      contractService.getAllContractsWithStudentName({
-        status: statusFilter || undefined,
-        group_id: groupFilter,
-        archive_year: archiveYearFilter,
-      }),
+    queryFn: async () => {
+      setLoadProgress(null);
+      const rows = await contractService.getAllContractsWithStudentName(
+        {
+          status: statusFilter || undefined,
+          group_id: groupFilter,
+          archive_year: archiveYearFilter,
+        },
+        (loaded, total) => setLoadProgress({ loaded, total }),
+      );
+      setLoadProgress(null);
+      return rows;
+    },
     enabled: view === "contracts",
     placeholderData: keepPreviousData,
+    // A full list is costly to fetch: keep it around. Coming back to the page
+    // shows the cached list at once and refreshes it quietly once stale.
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
+
+  // `/contracts/withname` rows can arrive without `student_id`. Look it up only
+  // for the contract actually clicked, then open that student.
+  const [openingStudentFor, setOpeningStudentFor] = useState<number | null>(
+    null,
+  );
+
+  const openContractStudent = async (contract: ContractWithStudentNameRead) => {
+    if (contract.student_id) {
+      navigate(`/students/${contract.student_id}`);
+      return;
+    }
+    if (openingStudentFor) return;
+
+    setOpeningStudentFor(contract.id);
+    try {
+      // Same lookup the old list used for every row (`contract_number` filter
+      // on /contracts), now done for this one contract only.
+      const response = await contractService.getContracts({
+        contract_number: contract.contract_number,
+        page: 1,
+        page_size: 20,
+      });
+      const studentId = response.data?.find(
+        (row) => row.id === contract.id,
+      )?.student_id;
+      if (studentId) {
+        navigate(`/students/${studentId}`);
+      }
+    } catch {
+      // The response interceptor already shows the error.
+    } finally {
+      setOpeningStudentFor(null);
+    }
+  };
 
   // group_id → group, for the group name and birth year of each contract.
   const groupById = useMemo(() => {
@@ -551,12 +611,6 @@ export default function Contracts() {
         </div>
       </motion.div>
 
-      {view !== "contracts" && (
-        <pre className="text-xs p-2 bg-muted rounded">
-          {JSON.stringify(terminatedSummaryQuery.data, null, 2)}
-        </pre>
-      )}
-
       {view !== "contracts" && terminatedSummaryQuery.data?.data && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -775,11 +829,30 @@ export default function Contracts() {
           </CardHeader>
 
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <span className="ml-2 text-muted-foreground">
-                {t("loading") || "Loading..."}
-              </span>
+            <div className="flex flex-col items-center justify-center gap-3 py-12">
+              <div className="flex items-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">
+                  {t("loading") || "Loading..."}
+                  {/* How far the full list has come, so a long load reads as
+                      progress rather than a hang. */}
+                  {view === "contracts" && loadProgress && loadProgress.total > 0 && (
+                    <span className="ml-1 tabular-nums">
+                      {loadProgress.loaded} / {loadProgress.total}
+                    </span>
+                  )}
+                </span>
+              </div>
+              {view === "contracts" && loadProgress && loadProgress.total > 0 && (
+                <div className="h-1.5 w-56 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-300"
+                    style={{
+                      width: `${Math.min(100, (loadProgress.loaded / loadProgress.total) * 100)}%`,
+                    }}
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -840,12 +913,14 @@ export default function Contracts() {
                                 className="flex items-center gap-2 cursor-pointer group select-none"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  if (contract.student_id) {
-                                    navigate(`/students/${contract.student_id}`);
-                                  }
+                                  void openContractStudent(contract);
                                 }}
                               >
-                                <User className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                {openingStudentFor === contract.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                                ) : (
+                                  <User className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                )}
                                 <span className="font-medium text-foreground group-hover:text-primary group-hover:underline transition-colors">
                                   {formatFullName(contract.student_full_name) ||
                                     contract.student_full_name ||
