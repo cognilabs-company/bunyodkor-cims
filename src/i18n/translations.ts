@@ -215,6 +215,7 @@
     pleaseWaitDoNotClose:
       "Please wait, do not close the dialog until the process is complete...",
     searchByContractNumber: "Search by contract number...",
+    searchContractsPlaceholder: "Search by name, contract number or group...",
     allContracts: "All Contracts",
     manageContracts: "Manage student contracts and fees",
     getStartedContract: "Create your first contract to get started.",
@@ -1327,6 +1328,7 @@
     pleaseWaitDoNotClose:
       "Iltimos kuting, jarayon tugaguncha dialog oynasini yopmang...",
     searchByContractNumber: "Shartnoma raqami bo'yicha qidirish...",
+    searchContractsPlaceholder: "Ism, shartnoma raqami yoki guruh bo'yicha qidirish...",
     allContracts: "Barcha shartnomalar",
     manageContracts: "Talaba shartnomalarini va to'lovlarni boshqarish",
     getStartedContract: "Birinchi shartnomangizni yaratish orqali boshlang",
@@ -2456,6 +2458,7 @@
     pleaseWaitDoNotClose:
       "Пожалуйста, подождите, не закрывайте диалоговое окно до завершения процесса...",
     searchByContractNumber: "Поиск по номеру контракта...",
+    searchContractsPlaceholder: "Поиск по имени, номеру контракта или группе...",
     allContracts: "Все контракты",
     manageContracts: "Управление студенческими контрактами и оплатой",
     getStartedContract: "Начните с создания первого контракта",

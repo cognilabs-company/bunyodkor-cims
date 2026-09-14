@@ -908,6 +908,46 @@ export const groupService = {
 // CONTRACT SERVICES
 // ============================================================================
 
+/**
+ * Collects every row of a paginated list endpoint.
+ *
+ * Asks for 100 rows a page and falls back to 20 if the endpoint rejects that
+ * size (422). Remaining pages are requested a few at a time rather than all at
+ * once, to stay gentle on the API.
+ */
+async function fetchAllPages<T>(
+  fetchPage: (page: number, pageSize: number) => Promise<ApiResponse<T[]>>,
+): Promise<T[]> {
+  const CONCURRENCY = 4;
+  let pageSize = 100;
+  let first: ApiResponse<T[]>;
+
+  try {
+    first = await fetchPage(1, pageSize);
+  } catch (error) {
+    const status = (error as { response?: { status?: number } })?.response
+      ?.status;
+    if (status !== 422) throw error;
+    pageSize = 20;
+    first = await fetchPage(1, pageSize);
+  }
+
+  const rows = [...(first.data || [])];
+  const totalPages = first.meta?.total_pages ?? 1;
+
+  for (let start = 2; start <= totalPages; start += CONCURRENCY) {
+    const batch = Array.from(
+      { length: Math.min(CONCURRENCY, totalPages - start + 1) },
+      (_, i) => fetchPage(start + i, pageSize),
+    );
+    for (const response of await Promise.all(batch)) {
+      rows.push(...(response.data || []));
+    }
+  }
+
+  return rows;
+}
+
 export interface GetContractsParams {
   archive_year?: number;
   include_archived?: boolean;
@@ -953,6 +993,43 @@ export const contractService = {
       ApiResponse<ContractWithStudentNameRead[]>
     >("/contracts/withname", { params });
     return response.data;
+  },
+
+  /**
+   * Every contract matching the filters, across all pages, with the student's
+   * name and `student_id` on each row.
+   *
+   * The list screen sorts by birth year and searches by name, both of which
+   * must see the whole filtered set: sorting or searching one server page of
+   * ten would give wrong results. Pages are fetched a few at a time.
+   *
+   * `/contracts/withname` is the source; `/contracts` is only called too if
+   * the rows arrive without `student_id`, to fill it in.
+   */
+  getAllContractsWithStudentName: async (
+    params: Omit<GetContractsWithStudentNameParams, "page" | "page_size">,
+  ): Promise<ContractWithStudentNameRead[]> => {
+    const rows = await fetchAllPages((page, page_size) =>
+      contractService.getContractsWithStudentName({
+        ...params,
+        page,
+        page_size,
+      }),
+    );
+
+    if (rows.every((row) => row.student_id != null)) return rows;
+
+    const standard = await fetchAllPages((page, page_size) =>
+      contractService.getContracts({ ...params, page, page_size }),
+    );
+    const studentIdByContract = new Map(
+      standard.map((contract) => [contract.id, contract.student_id]),
+    );
+
+    return rows.map((row) => ({
+      ...row,
+      student_id: row.student_id ?? studentIdByContract.get(row.id)!,
+    }));
   },
 
   /**

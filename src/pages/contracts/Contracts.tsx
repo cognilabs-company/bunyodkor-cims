@@ -1,7 +1,18 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Fragment, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { toast } from "react-hot-toast";
@@ -30,6 +41,11 @@ import { useLanguageStore } from "@/store/languageStore";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePermissions } from "@/hooks/usePermissions";
 import { downloadFile } from "@/lib/export-utils";
+import {
+  buildSearchEntry,
+  matchesSearch,
+  tokenizeQuery,
+} from "@/lib/search-utils";
 import {
   formatFullName,
   formatGroupSelectLabel,
@@ -60,6 +76,8 @@ import {
 } from "lucide-react";
 
 type ContractsView = "contracts" | "terminated-students" | "terminated-unpaid";
+
+const CONTRACTS_PAGE_SIZE = 10;
 
 export default function Contracts() {
   const { t } = useLanguageStore();
@@ -139,61 +157,100 @@ export default function Contracts() {
     [allGroupsData, isLoadingGroups, t],
   );
 
+  // The whole filtered set, loaded once per filter combination. Sorting and
+  // searching happen below, in the browser: both need every row, and typing in
+  // the search box then costs no network round-trip at all.
   const contractsQuery = useQuery({
-    queryKey: [
-      "contracts",
-      page,
-      debouncedSearch,
-      statusFilter,
-      groupFilter,
-      archiveYearFilter,
-      contractIdFilter,
-      view,
-    ],
-    queryFn: async () => {
-      const params = {
-        page,
-        page_size: 10,
-        contract_number: debouncedSearch || undefined,
+    queryKey: ["contracts", "all", statusFilter, groupFilter, archiveYearFilter],
+    queryFn: () =>
+      contractService.getAllContractsWithStudentName({
         status: statusFilter || undefined,
         group_id: groupFilter,
         archive_year: archiveYearFilter,
-      };
-
-      const [withNameRes, standardRes] = await Promise.all([
-        contractService.getContractsWithStudentName(params),
-        contractService.getContracts({
-          ...params,
-          contract_id: contractIdFilter,
-        }),
-      ]);
-
-      const mergedData = withNameRes.data
-        .map((contractWithName: any) => {
-          const standardContract = standardRes.data.find(
-            (c: any) => c.id === contractWithName.id,
-          );
-          return {
-            ...contractWithName,
-            student_id: standardContract?.student_id,
-          };
-        })
-        .filter((contract: ContractWithStudentNameRead) =>
-          contractIdFilter ? contract.id === contractIdFilter : true,
-        );
-
-      return {
-        ...withNameRes,
-        data: mergedData,
-        meta: {
-          ...withNameRes.meta,
-          total: contractIdFilter ? mergedData.length : withNameRes.meta?.total,
-          total_pages: contractIdFilter ? 1 : withNameRes.meta?.total_pages,
-        },
-      };
-    },
+      }),
     enabled: view === "contracts",
+    placeholderData: keepPreviousData,
   });
+
+  // group_id → group, for the group name and birth year of each contract.
+  const groupById = useMemo(() => {
+    const map = new Map<number, { name: string; birth_year: number }>();
+    (allGroupsData || []).forEach((yearGroup: any) =>
+      (yearGroup?.groups || []).forEach((group: any) => {
+        if (group?.id) map.set(group.id, group);
+      }),
+    );
+    return map;
+  }, [allGroupsData]);
+
+  // Oldest birth year first (2008, 2009, …), then by the contract's running
+  // serial within the year. Uses the payload's own fields — never letters
+  // parsed out of the contract number, which stops describing the group after
+  // a transfer.
+  const indexedContracts = useMemo(() => {
+    const birthYearOf = (contract: ContractWithStudentNameRead) =>
+      contract.birth_year ??
+      groupById.get(contract.group_id)?.birth_year ??
+      Number.MAX_SAFE_INTEGER;
+
+    return [...(contractsQuery.data || [])]
+      .sort(
+        (a, b) =>
+          birthYearOf(a) - birthYearOf(b) ||
+          (a.sequence_number ?? Number.MAX_SAFE_INTEGER) -
+            (b.sequence_number ?? Number.MAX_SAFE_INTEGER) ||
+          String(a.contract_number).localeCompare(
+            String(b.contract_number),
+            undefined,
+            { numeric: true },
+          ) ||
+          a.id - b.id,
+      )
+      .map((contract) => {
+        const group = groupById.get(contract.group_id);
+        return {
+          contract,
+          search: buildSearchEntry([
+            contract.student_full_name,
+            contract.contract_number,
+            group?.name,
+            contract.birth_year ?? group?.birth_year,
+          ]),
+        };
+      });
+  }, [contractsQuery.data, groupById]);
+
+  // Search follows every keystroke; useDeferredValue keeps typing smooth.
+  const contractsSearch = useDeferredValue(search);
+
+  const filteredContracts = useMemo(() => {
+    const tokens = tokenizeQuery(contractsSearch);
+    return indexedContracts
+      .filter(
+        ({ contract, search: entry }) =>
+          (!contractIdFilter || contract.id === contractIdFilter) &&
+          (tokens.length === 0 || matchesSearch(entry, tokens)),
+      )
+      .map(({ contract }) => contract);
+  }, [indexedContracts, contractsSearch, contractIdFilter]);
+
+  const contractsPageData = useMemo(() => {
+    const totalPagesForContracts = Math.max(
+      1,
+      Math.ceil(filteredContracts.length / CONTRACTS_PAGE_SIZE),
+    );
+    const currentPage = Math.min(page, totalPagesForContracts);
+    const start = (currentPage - 1) * CONTRACTS_PAGE_SIZE;
+    return {
+      data: filteredContracts.slice(start, start + CONTRACTS_PAGE_SIZE),
+      meta: {
+        page: currentPage,
+        page_size: CONTRACTS_PAGE_SIZE,
+        total: filteredContracts.length,
+        total_pages: totalPagesForContracts,
+      },
+    };
+  }, [filteredContracts, page]);
 
   const terminatedSummaryQuery = useQuery({
     queryKey: ["contracts-terminated-summary", terminatedFrom, terminatedTo],
@@ -260,7 +317,7 @@ export default function Contracts() {
 
   const currentData =
     view === "contracts"
-      ? contractsQuery.data
+      ? contractsPageData
       : view === "terminated-students"
         ? terminatedStudentsQuery.data
         : terminatedUnpaidQuery.data;
@@ -568,7 +625,11 @@ export default function Contracts() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder={t("searchByContractNumber")}
+                  placeholder={
+                    view === "contracts"
+                      ? t("searchContractsPlaceholder")
+                      : t("searchByContractNumber")
+                  }
                   value={search}
                   onChange={handleSearchChange}
                   className="pl-10 pr-10"
@@ -708,12 +769,23 @@ export default function Contracts() {
       >
         <Card>
           <CardHeader className="border-b border-border">
-            <CardTitle className="text-lg">
+            <CardTitle className="text-lg flex flex-wrap items-center gap-2">
               {view === "contracts"
                 ? t("contractsList")
                 : view === "terminated-students"
                   ? t("terminatedStudents")
                   : t("terminatedUnpaidReport")}
+              {/* How many rows the current filters and search leave. */}
+              {view === "contracts" && contractsQuery.data && (
+                <Badge variant="secondary" className="font-semibold">
+                  {filteredContracts.length}
+                  {contractsSearch.trim() &&
+                    ` / ${contractsQuery.data.length}`}
+                </Badge>
+              )}
+              {view === "contracts" && contractsQuery.isFetching && (
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              )}
             </CardTitle>
           </CardHeader>
 
