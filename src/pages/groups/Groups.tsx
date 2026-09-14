@@ -61,6 +61,7 @@ import { YearLimitDialog } from "@/pages/year-limits/YearLimitDialog";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { apiClient } from "@/lib/api-client";
 import { downloadFile } from "@/lib/export-utils";
+import { compareContracts } from "@/lib/contract-order";
 import { formatFullName, formatNameParts } from "@/lib/name-utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { yearLimitKeys } from "@/hooks/useYearLimit";
@@ -954,7 +955,13 @@ export default function Groups() {
               groupContractsData.data.length > 0 ? (
               // O'ZGARISH 1: Containerga padding (p-4) va gap berildi
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-                {groupContractsData.data.map((contract: ContractRead) => (
+                {/* In contract order (22-2008C1, 23-2008C1, …), filling the
+                    grid left to right, row by row. */}
+                {[...groupContractsData.data]
+                  .sort((a: ContractRead, b: ContractRead) =>
+                    compareContracts(a, b),
+                  )
+                  .map((contract: ContractRead) => (
                   <Card
                     key={contract.id}
                     // O'ZGARISH 2: Card dizayni zamonaviylashtirildi

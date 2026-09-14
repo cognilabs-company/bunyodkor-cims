@@ -41,6 +41,7 @@ import { useLanguageStore } from "@/store/languageStore";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePermissions } from "@/hooks/usePermissions";
 import { downloadFile } from "@/lib/export-utils";
+import { compareContracts } from "@/lib/contract-order";
 import {
   buildSearchEntry,
   matchesSearch,
@@ -183,29 +184,13 @@ export default function Contracts() {
     return map;
   }, [allGroupsData]);
 
-  // Oldest birth year first (2008, 2009, …), then by the contract's running
-  // serial within the year. Uses the payload's own fields — never letters
-  // parsed out of the contract number, which stops describing the group after
-  // a transfer.
+  // Oldest birth year first, then by serial — see lib/contract-order.
   const indexedContracts = useMemo(() => {
     const birthYearOf = (contract: ContractWithStudentNameRead) =>
-      contract.birth_year ??
-      groupById.get(contract.group_id)?.birth_year ??
-      Number.MAX_SAFE_INTEGER;
+      contract.birth_year ?? groupById.get(contract.group_id)?.birth_year;
 
     return [...(contractsQuery.data || [])]
-      .sort(
-        (a, b) =>
-          birthYearOf(a) - birthYearOf(b) ||
-          (a.sequence_number ?? Number.MAX_SAFE_INTEGER) -
-            (b.sequence_number ?? Number.MAX_SAFE_INTEGER) ||
-          String(a.contract_number).localeCompare(
-            String(b.contract_number),
-            undefined,
-            { numeric: true },
-          ) ||
-          a.id - b.id,
-      )
+      .sort((a, b) => compareContracts(a, b, birthYearOf))
       .map((contract) => {
         const group = groupById.get(contract.group_id);
         return {
