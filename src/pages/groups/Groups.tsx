@@ -682,7 +682,7 @@ export default function Groups() {
                       aria-hidden="true"
                       className="hidden sm:block h-5 w-px bg-border"
                     />
-                    <div className="flex items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {canWrite("groups:edit") && (
                         <Button
                           type="button"
@@ -699,20 +699,29 @@ export default function Groups() {
                         </Button>
                       )}
                       {yearLimit ? (
-                        yearLimit.is_full ? (
-                          <Badge variant="destructive">
-                            {t("yearLimitFullBadge")
-                              .replace("{{used}}", String(yearLimit.current_count))
-                              .replace("{{max}}", String(yearLimit.max_students))}
+                        <>
+                          {/* Places left — the figure that matters, in colour. */}
+                          {yearLimit.is_full ? (
+                            <Badge variant="destructive">
+                              {t("yearLimitFullShort")}
+                            </Badge>
+                          ) : (
+                            <Badge variant="default" className="tabular-nums">
+                              {t("yearLimitSlotsShort").replace(
+                                "{{count}}",
+                                String(yearRemaining),
+                              )}
+                            </Badge>
+                          )}
+                          {/* Enrolled / limit — context, kept quiet. */}
+                          <Badge
+                            variant="outline"
+                            className="font-medium text-muted-foreground tabular-nums"
+                            title={`${t("currentlyEnrolled")} / ${t("maxStudents")}`}
+                          >
+                            {yearLimit.current_count}/{yearLimit.max_students}
                           </Badge>
-                        ) : (
-                          <Badge variant="default">
-                            {t("yearLimitBadge")
-                              .replace("{{remaining}}", String(yearRemaining))
-                              .replace("{{used}}", String(yearLimit.current_count))
-                              .replace("{{max}}", String(yearLimit.max_students))}
-                          </Badge>
-                        )
+                        </>
                       ) : (
                         <Badge
                           variant="outline"

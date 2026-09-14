@@ -1107,8 +1107,8 @@
     yearLimitReachedShort:
       "{{year}} is full — no new students can be enrolled.",
     yearLimitSlotsLeft: "{{count}} places left",
-    yearLimitBadge: "{{remaining}} left ({{used}}/{{max}})",
-    yearLimitFullBadge: "Year full ({{used}}/{{max}})",
+    yearLimitSlotsShort: "{{count}} left",
+    yearLimitFullShort: "Year full",
   },
 
   uz: {
@@ -2239,8 +2239,8 @@
     yearLimitReachedShort:
       "{{year}}-yil to'lgan — yangi o'quvchi qo'shib bo'lmaydi.",
     yearLimitSlotsLeft: "{{count}} ta joy qoldi",
-    yearLimitBadge: "{{remaining}} ta joy ({{used}}/{{max}})",
-    yearLimitFullBadge: "Yil to'lgan ({{used}}/{{max}})",
+    yearLimitSlotsShort: "{{count}} ta joy",
+    yearLimitFullShort: "Yil to'lgan",
   },
 
   ru: {
@@ -3328,7 +3328,7 @@
     yearLimitReachedShort:
       "{{year}} год заполнен — новых учеников добавить нельзя.",
     yearLimitSlotsLeft: "Осталось мест: {{count}}",
-    yearLimitBadge: "Осталось {{remaining}} ({{used}}/{{max}})",
-    yearLimitFullBadge: "Год заполнен ({{used}}/{{max}})",
+    yearLimitSlotsShort: "Осталось {{count}}",
+    yearLimitFullShort: "Год заполнен",
   },
 };
