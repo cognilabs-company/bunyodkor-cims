@@ -121,9 +121,9 @@ export function AssignTransactionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent onClose={() => onOpenChange(false)}>
         <DialogHeader>
-          <DialogTitle>{t('assignTransactionTitle', { transactionId: transaction.id })}</DialogTitle>
+          <DialogTitle>{t('assignTransactionTitle').replace('{transactionId}', String(transaction.id))}</DialogTitle>
           <DialogDescription>
-            {t('assignTransactionDescription', { amount: new Intl.NumberFormat('uz-UZ').format(transaction.amount) })}
+            {t('assignTransactionDescription').replace('{amount}', new Intl.NumberFormat('uz-UZ').format(transaction.amount))}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
