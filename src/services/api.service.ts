@@ -1361,9 +1361,12 @@ export const contractService = {
    * POST /contracts/clone-from-terminated
    */
   cloneFromTerminated: async (data: any): Promise<ApiResponse<any>> => {
+    // Both restore dialogs explain failures themselves (taken number, year
+    // limit, already restored), so the raw message isn't toasted twice.
     const response = await apiClient.post<ApiResponse<any>>(
       "/contracts/clone-from-terminated",
       data,
+      { suppressGlobalErrorToast: true } as object,
     );
     return response.data;
   },

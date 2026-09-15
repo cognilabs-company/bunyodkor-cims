@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { reportService, contractService, groupService } from "@/services/api.service";
 import {
@@ -18,6 +18,8 @@ import { useLanguageStore } from "@/store/languageStore";
 import { formatGroupSelectLabel } from "@/lib/name-utils";
 import { useYearLimit, invalidateYearLimits } from "@/hooks/useYearLimit";
 import { YearLimitNotice } from "@/components/year-limits/YearLimitNotice";
+import { ManualContractNumberConfirm } from "@/components/contracts/ManualContractNumberConfirm";
+import { AlertTriangle, Pencil, RotateCcw } from "lucide-react";
 import toast from "react-hot-toast";
 
 const formatDateInputValue = (date: Date) => {
@@ -53,6 +55,25 @@ export function CloneContractDialog({ open, onOpenChange, terminatedContractId }
     monthly_fee: 800000,
   });
 
+  // Contract number: assigned automatically from the group, but staff may take
+  // it over by hand after confirming. A manual number is never overwritten.
+  const [isNumberManual, setIsNumberManual] = useState(false);
+  const [showManualConfirm, setShowManualConfirm] = useState(false);
+  const isNumberManualRef = useRef(false);
+  useEffect(() => {
+    isNumberManualRef.current = isNumberManual;
+  }, [isNumberManual]);
+
+  // Every opening starts clean: automatic mode and no number left over from
+  // the contract this dialog was last opened for. (Declared before the effect
+  // below that fills the number in, so it runs first.)
+  useEffect(() => {
+    if (!open) return;
+    setIsNumberManual(false);
+    setShowManualConfirm(false);
+    setFormData((current) => ({ ...current, contract_number: "" }));
+  }, [open, terminatedContractId]);
+
   const { data: availableInfo, isLoading } = useQuery({
     queryKey: ["clone-available", terminatedContractId],
     queryFn: () => reportService.getCloneAvailableInfo(terminatedContractId),
@@ -83,7 +104,7 @@ export function CloneContractDialog({ open, onOpenChange, terminatedContractId }
     enabled: open,
   });
 
-  const { data: suggestedContractNumber } =
+  const { data: suggestedContractNumber, refetch: refetchSuggestedNumber } =
     useQuery({
       queryKey: ["next-available-contract-number", formData.group_id],
       queryFn: () => contractService.getNextAvailableNumber(formData.group_id),
@@ -111,12 +132,40 @@ export function CloneContractDialog({ open, onOpenChange, terminatedContractId }
 
   useEffect(() => {
     if (!suggestedContractNumber?.contract_number) return;
+    // A number typed by hand stays until staff switch back to automatic.
+    if (isNumberManualRef.current) return;
 
     setFormData((current) => ({
       ...current,
       contract_number: suggestedContractNumber.contract_number,
     }));
-  }, [suggestedContractNumber]);
+    // `open` too: reopening for the same group reuses the cached suggestion,
+    // which would otherwise not refill the number cleared on opening.
+  }, [suggestedContractNumber, open]);
+
+  const handleCancelManualNumber = useCallback(
+    () => setShowManualConfirm(false),
+    [],
+  );
+
+  const handleConfirmManualNumber = () => {
+    setShowManualConfirm(false);
+    setIsNumberManual(true);
+    requestAnimationFrame(() =>
+      document.getElementById("clone_contract_number")?.focus(),
+    );
+  };
+
+  const handleRestoreAutoNumber = async () => {
+    setIsNumberManual(false);
+    isNumberManualRef.current = false;
+    const result = await refetchSuggestedNumber();
+    const contractNumber =
+      result.data?.contract_number || suggestedContractNumber?.contract_number;
+    if (contractNumber) {
+      setFormData((current) => ({ ...current, contract_number: contractNumber }));
+    }
+  };
 
   // Cloning a terminated contract creates a NEW active contract, so it counts
   // against the birth-year limit exactly like a fresh enrolment does.
@@ -136,15 +185,49 @@ export function CloneContractDialog({ open, onOpenChange, terminatedContractId }
       toast.success(t("contractClonedSuccess") || "Contract activated successfully");
       onOpenChange(false);
     },
-    onError: (error: any) => {
+    onError: async (error: any, variables: any) => {
       // 409 = the birth year filled up since the banner loaded; re-read it and
       // show the server's own explanation rather than the generic message.
       if (error?.response?.status === 409) invalidateYearLimits(queryClient);
 
       const detail = error?.response?.data?.detail;
-      toast.error(
-        typeof detail === "string" ? detail : t("failedToCloneContract"),
+      const message =
+        typeof detail === "string" ? detail : t("failedToCloneContract");
+
+      // Only a taken *number* — not "this contract was already restored",
+      // which the same endpoint also answers with 409.
+      const isNumberTaken = /already used|just taken|contract number[^.]*already (exists|taken)/i.test(
+        message,
       );
+      if (!isNumberTaken) {
+        toast.error(message);
+        return;
+      }
+
+      const sentNumber = String(variables?.contract_number || "");
+      if (isNumberManualRef.current) {
+        toast.error(
+          t("manualContractNumberTaken").replace("{{number}}", sentNumber),
+          { duration: 8000 },
+        );
+        return;
+      }
+
+      const fresh = (await refetchSuggestedNumber()).data?.contract_number;
+      if (fresh && fresh !== sentNumber) {
+        setFormData((current) => ({ ...current, contract_number: fresh }));
+        toast.error(
+          t("contractNumberTakenNewAssigned")
+            .replace("{{old}}", sentNumber)
+            .replace("{{number}}", fresh),
+          { duration: 8000 },
+        );
+      } else {
+        toast.error(
+          t("contractNumberServerConflict").replace("{{number}}", sentNumber),
+          { duration: 10000 },
+        );
+      }
     },
   });
 
@@ -231,12 +314,16 @@ export function CloneContractDialog({ open, onOpenChange, terminatedContractId }
               <SearchableSelect
                 id="group_id"
                 value={formData.group_id ? String(formData.group_id) : ""}
-                onValueChange={(value) =>
+                onValueChange={(value) => {
+                  // A number typed for one group doesn't belong to another:
+                  // a new group goes back to its automatic number.
+                  setIsNumberManual(false);
+                  isNumberManualRef.current = false;
                   setFormData((current) => ({
                     ...current,
                     group_id: value ? Number(value) : 0,
-                  }))
-                }
+                  }));
+                }}
                 options={groupOptions}
                 placeholder={t("selectGroup") || "Select group"}
                 searchPlaceholder={`${t("search") || "Search"}...`}
@@ -251,21 +338,72 @@ export function CloneContractDialog({ open, onOpenChange, terminatedContractId }
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="contract_number">{t("contractNumber")}</Label>
-              {/* Frozen, never-reused serial assigned from the group — read-only. */}
-              <Input
-                id="contract_number"
-                name="contract_number"
-                value={formData.contract_number}
-                readOnly
-                aria-readonly="true"
-                tabIndex={-1}
-                placeholder={t("contractNumber")}
-                className="bg-muted/50 cursor-not-allowed font-mono"
-              />
-              <p className="text-xs text-muted-foreground">
-                {t("contractNumberFrozenHint")}
-              </p>
+              <Label htmlFor="clone_contract_number">{t("contractNumber")}</Label>
+              {/* Assigned from the group. Clicking asks for confirmation before
+                  it becomes editable — families pay against this number. */}
+              <div className="relative">
+                <Input
+                  id="clone_contract_number"
+                  name="contract_number"
+                  value={formData.contract_number}
+                  readOnly={!isNumberManual}
+                  aria-readonly={!isNumberManual}
+                  onClick={() => {
+                    if (!isNumberManual) setShowManualConfirm(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (!isNumberManual && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
+                      setShowManualConfirm(true);
+                    }
+                  }}
+                  onChange={(e) => {
+                    if (!isNumberManual) return;
+                    const value = e.target.value;
+                    setFormData((current) => ({
+                      ...current,
+                      contract_number: value,
+                    }));
+                  }}
+                  placeholder={t("contractNumber")}
+                  className={
+                    isNumberManual
+                      ? "pr-10 font-mono border-amber-400 focus-visible:ring-amber-300"
+                      : "pr-10 font-mono bg-muted/50 cursor-pointer"
+                  }
+                />
+                {!isNumberManual && (
+                  <button
+                    type="button"
+                    onClick={() => setShowManualConfirm(true)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    title={t("editContractNumberManually")}
+                    aria-label={t("editContractNumberManually")}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              {isNumberManual ? (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    {t("contractNumberManualHint")}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void handleRestoreAutoNumber()}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    {t("restoreAutoContractNumber")}
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {t("contractNumberAutoHint")}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -332,6 +470,12 @@ export function CloneContractDialog({ open, onOpenChange, terminatedContractId }
             {t("activate")}
           </Button>
         </DialogFooter>
+        <ManualContractNumberConfirm
+          open={showManualConfirm}
+          contractNumber={formData.contract_number}
+          onCancel={handleCancelManualNumber}
+          onConfirm={handleConfirmManualNumber}
+        />
       </DialogContent>
     </Dialog>
   );
