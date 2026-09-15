@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -13,8 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SearchableSelect } from "@/components/ui/searchable-select";
-import { DatePicker } from "@/components/ui/date-picker";
+import { Select } from "@/components/ui/select";
 import toast from "react-hot-toast";
 import {
   studentService,
@@ -157,7 +156,6 @@ export function StudentWithContractDialog({
     setValue,
     getValues,
     setFocus,
-    control,
     formState: { errors },
   } = useForm<StudentFormData>({
     defaultValues: {
@@ -195,33 +193,18 @@ export function StudentWithContractDialog({
     enabled: open,
   });
 
-  // Oldest birth year first (2008, 2009, …), then by group name, listed under a
-  // heading per year.
-  const groupOptions = useMemo(
+  // Oldest birth year first (2008, 2009, …), then by group name.
+  const sortedGroups = useMemo(
     () =>
-      [...(groupsData?.data || [])]
-        .sort(
-          (a: GroupRead, b: GroupRead) =>
-            (Number(a.birth_year) || 0) - (Number(b.birth_year) || 0) ||
-            String(a.name || a.identifier).localeCompare(
-              String(b.name || b.identifier),
-              undefined,
-              { numeric: true },
-            ),
-        )
-        .map((group: GroupRead) => {
-          const coach = [group.coach_last_name, group.coach_first_name]
-            .filter(Boolean)
-            .join(" ");
-          return {
-            value: String(group.id),
-            label: group.name || group.identifier || `#${group.id}`,
-            description: coach || undefined,
-            section: group.birth_year ? String(group.birth_year) : undefined,
-            selectedLabel: formatGroupSelectLabel(group),
-            keywords: [group.identifier, String(group.birth_year ?? "")],
-          };
-        }),
+      [...(groupsData?.data || [])].sort(
+        (a: GroupRead, b: GroupRead) =>
+          (Number(a.birth_year) || 0) - (Number(b.birth_year) || 0) ||
+          String(a.name || a.identifier).localeCompare(
+            String(b.name || b.identifier),
+            undefined,
+            { numeric: true },
+          ),
+      ),
     [groupsData],
   );
 
@@ -794,34 +777,6 @@ export function StudentWithContractDialog({
     }
   };
 
-  // Date fields use the app's calendar instead of the browser date input.
-  // Values stay "yyyy-MM-dd" strings, exactly what the form sent before.
-  const renderDateField = (
-    name:
-      | "date_of_birth"
-      | "tarbiyalanuvchi_when_give"
-      | "contract_start_date"
-      | "contract_end_date"
-      | "buyurtmachi_when_give",
-    options: { required?: boolean; fromYear?: number; toYear?: number } = {},
-  ) => (
-    <Controller
-      control={control}
-      name={name}
-      rules={{ required: options.required }}
-      render={({ field, fieldState }) => (
-        <DatePicker
-          value={typeof field.value === "string" ? field.value : ""}
-          onChange={field.onChange}
-          onBlur={field.onBlur}
-          invalid={Boolean(fieldState.error)}
-          fromYear={options.fromYear}
-          toYear={options.toYear}
-        />
-      )}
-    />
-  );
-
   return (
     <>
     <Dialog
@@ -896,11 +851,10 @@ export function StudentWithContractDialog({
                 </div>
                 <div className="space-y-1">
                   <Label>{t("dateOfBirth")} *</Label>
-                  {renderDateField("date_of_birth", {
-                    required: true,
-                    fromYear: 1990,
-                    toYear: new Date().getFullYear(),
-                  })}
+                  <Input
+                    type="date"
+                    {...register("date_of_birth", { required: true })}
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label>{t("phoneNumber")} *</Label>
@@ -923,24 +877,17 @@ export function StudentWithContractDialog({
                 </div>
                 <div className="space-y-1">
                   <Label>{t("group")} *</Label>
-                  <Controller
-                    control={control}
-                    name="group_id"
-                    rules={{ required: true }}
-                    render={({ field, fieldState }) => (
-                      <SearchableSelect
-                        value={field.value ? String(field.value) : ""}
-                        onValueChange={field.onChange}
-                        options={groupOptions}
-                        placeholder={t("selectGroupPlaceholder")}
-                        searchPlaceholder={`${t("search")}...`}
-                        emptyText={t("noDataFound")}
-                        invalid={Boolean(fieldState.error)}
-                        triggerClassName="h-9"
-                        contentClassName="z-[10030]"
-                      />
-                    )}
-                  />
+                  <Select
+                    {...register("group_id", { required: true })}
+                    className="h-10"
+                  >
+                    <option value="">{t("selectGroupPlaceholder")}</option>
+                    {sortedGroups.map((group: GroupRead) => (
+                      <option key={group.id} value={String(group.id)}>
+                        {formatGroupSelectLabel(group)}
+                      </option>
+                    ))}
+                  </Select>
                   {/* Places left in the group's birth year — this, not the
                       group's capacity, is what can block the enrolment. */}
                   <YearLimitNotice birthYear={selectedGroupBirthYear} />
@@ -975,10 +922,10 @@ export function StudentWithContractDialog({
                 </div>
                 <div>
                   <Label>{t("issuedDate")}</Label>
-                  {renderDateField("tarbiyalanuvchi_when_give", {
-                    fromYear: 1990,
-                    toYear: new Date().getFullYear(),
-                  })}
+                  <Input
+                    type="date"
+                    {...register("tarbiyalanuvchi_when_give")}
+                  />
                 </div>
                 <div>
                   <Label>{t("issuedBy")}</Label>
@@ -1100,11 +1047,17 @@ export function StudentWithContractDialog({
               </div>
               <div className="space-y-1">
                 <Label>{t("startDate")} *</Label>
-                {renderDateField("contract_start_date", { required: true })}
+                <Input
+                  type="date"
+                  {...register("contract_start_date", { required: true })}
+                />
               </div>
               <div className="space-y-1">
                 <Label>{t("endDate")} *</Label>
-                {renderDateField("contract_end_date", { required: true })}
+                <Input
+                  type="date"
+                  {...register("contract_end_date", { required: true })}
+                />
               </div>
               <div className="space-y-1">
                 <Label>{t("monthlyFee")} (UZS) *</Label>
@@ -1193,20 +1146,17 @@ export function StudentWithContractDialog({
                 <div className="space-y-2">
                   <div>
                     <Label>{t("customerType")} *</Label>
-                    <SearchableSelect
+                    <Select
                       value={customerType}
-                      onValueChange={(value) =>
-                        handleCustomerTypeChange(value as any)
+                      onChange={(e) =>
+                        handleCustomerTypeChange(e.target.value as any)
                       }
-                      options={[
-                        { value: "father", label: t("father") },
-                        { value: "mother", label: t("mother") },
-                        { value: "other", label: t("other") },
-                      ]}
-                      searchable={false}
-                      triggerClassName="h-9"
-                      contentClassName="z-[10030]"
-                    />
+                      className="h-10"
+                    >
+                      <option value="father">{t("father")}</option>
+                      <option value="mother">{t("mother")}</option>
+                      <option value="other">{t("other")}</option>
+                    </Select>
                   </div>
                   <div>
                     <Label>{t("fullName")} *</Label>
@@ -1258,10 +1208,7 @@ export function StudentWithContractDialog({
                   </div>
                   <div>
                     <Label>{t("issuedDate")}</Label>
-                    {renderDateField("buyurtmachi_when_give", {
-                      fromYear: 1950,
-                      toYear: new Date().getFullYear(),
-                    })}
+                    <Input type="date" {...register("buyurtmachi_when_give")} />
                   </div>
                   <div>
                     <Label>{t("issuedBy")}</Label>
