@@ -84,16 +84,16 @@ const DashboardLayout = () => {
       permission: "students:view",
     },
     {
-      path: "/groups",
-      label: t("groups"),
-      icon: GraduationCap,
-      permission: "groups:view",
-    },
-    {
       path: "/contracts",
       label: t("contracts"),
       icon: FileText,
       permission: "contracts:view",
+    },
+    {
+      path: "/groups",
+      label: t("groups"),
+      icon: GraduationCap,
+      permission: "groups:view",
     },
     {
       path: "/year-limits",
