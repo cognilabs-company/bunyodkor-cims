@@ -46,8 +46,7 @@ import { downloadFile } from "@/lib/export-utils";
 import { compareContractsNewestFirst } from "@/lib/contract-order";
 import {
   buildSearchEntry,
-  matchesSearch,
-  tokenizeQuery,
+  rankSearch,
 } from "@/lib/search-utils";
 import {
   formatFullName,
@@ -276,12 +275,18 @@ export default function Contracts() {
         const group = groupById.get(contract.group_id);
         return {
           contract,
-          search: buildSearchEntry([
-            contract.student_full_name,
+          // The contract number is the key: a query with digits is matched
+          // against it first, so "22-2008" lists 22-2008C1 (and its
+          // transfers), not every 2008-born student.
+          search: buildSearchEntry(
+            [
+              contract.student_full_name,
+              contract.contract_number,
+              group?.name,
+              contract.birth_year ?? group?.birth_year,
+            ],
             contract.contract_number,
-            group?.name,
-            contract.birth_year ?? group?.birth_year,
-          ]),
+          ),
         };
       });
   }, [contractsQuery.data, groupById]);
@@ -289,15 +294,16 @@ export default function Contracts() {
   // Search follows every keystroke; useDeferredValue keeps typing smooth.
   const contractsSearch = useDeferredValue(search);
 
+  // Best matches first (exact number, then numbers starting with the query,
+  // …); rows the query does not touch are dropped. Without a query the
+  // newest-first order above is kept.
   const filteredContracts = useMemo(() => {
-    const tokens = tokenizeQuery(contractsSearch);
-    return indexedContracts
-      .filter(
-        ({ contract, search: entry }) =>
-          (!contractIdFilter || contract.id === contractIdFilter) &&
-          (tokens.length === 0 || matchesSearch(entry, tokens)),
-      )
-      .map(({ contract }) => contract);
+    const scoped = contractIdFilter
+      ? indexedContracts.filter(({ contract }) => contract.id === contractIdFilter)
+      : indexedContracts;
+    return rankSearch(scoped, ({ search: entry }) => entry, contractsSearch).map(
+      ({ contract }) => contract,
+    );
   }, [indexedContracts, contractsSearch, contractIdFilter]);
 
   const contractsPageData = useMemo(() => {
