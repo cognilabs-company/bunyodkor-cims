@@ -47,6 +47,13 @@ import { ArrowRightLeft } from "lucide-react";
 import { TransferStudentDialog } from "@/components/students/TransferStudentDialog";
 import { useLanguageStore } from "@/store/languageStore";
 import { formatFullName, formatNameParts } from "@/lib/name-utils";
+import { Select } from "@/components/ui/select";
+import {
+  TERMINATION_INITIATORS,
+  parseTerminationInitiator,
+  terminationInitiatorKey,
+  type TerminationInitiator,
+} from "@/lib/termination";
 import type {
   StudentFullInfo,
   TransactionRead,
@@ -124,7 +131,9 @@ export default function StudentDetailPage() {
   const [isDeleteTransactionDialogOpen, setIsDeleteTransactionDialogOpen] =
     useState(false);
   const [isTerminateDialogOpen, setIsTerminateDialogOpen] = useState(false);
-  const [terminationReason, setTerminationReason] = useState("");
+  const [terminationInitiator, setTerminationInitiator] = useState<
+    TerminationInitiator | ""
+  >("");
   const [terminatedAt, setTerminatedAt] = useState(
     format(new Date(), "yyyy-MM-dd'T'HH:mm"),
   );
@@ -290,7 +299,7 @@ export default function StudentDetailPage() {
       invalidateYearLimits(queryClient);
       toast.success(t("contractUpdatedSuccess") || "Contract terminated");
       setIsTerminateDialogOpen(false);
-      setTerminationReason("");
+      setTerminationInitiator("");
       setTerminatedAt(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
     },
     onError: (error: any) => {
@@ -682,6 +691,46 @@ export default function StudentDetailPage() {
   console.log("[STUDENT DETAIL] Parents list:", parentsList);
   console.log("[STUDENT DETAIL] Guardians list:", guardiansList);
 
+  // Who asked for the termination, read back from the contract terminated
+  // last. A parent means the one who signed — the Buyurtmachi, or the father
+  // when the contract names no separate customer.
+  const terminatedContract =
+    contracts
+      ?.filter((c) => c.status !== "active" && c.terminated_at)
+      .sort(
+        (a, b) =>
+          new Date(b.terminated_at!).getTime() -
+          new Date(a.terminated_at!).getTime(),
+      )[0] || null;
+
+  const terminationInitiatorOf = parseTerminationInitiator(
+    terminatedContract?.termination_reason,
+  );
+
+  const contractCustomer =
+    displayParents.find((p) => p.relationship_type === "Buyurtmachi") ||
+    displayParents.find((p) => p.relationship_type === "Ota") ||
+    displayParents[0] ||
+    null;
+
+  const terminationInitiatorPerson =
+    terminationInitiatorOf === "parent"
+      ? {
+          name: formatNameParts(
+            contractCustomer?.last_name,
+            contractCustomer?.first_name,
+          ),
+          role: contractCustomer?.relationship_type || "",
+          phone: contractCustomer?.phone || "",
+        }
+      : terminationInitiatorOf === "coach"
+        ? {
+            name: formatFullName(coach?.full_name),
+            role: t("coach"),
+            phone: coach?.phone || "",
+          }
+        : null;
+
   return (
     <div className="space-y-6">
       <Link
@@ -830,8 +879,8 @@ export default function StudentDetailPage() {
 
 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* LEFT COLUMN: INFORMATION */}
-        <div className="lg:col-span-1">
-          <Card className="sticky top-6">
+        <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-6">
+          <Card>
             <CardHeader>
               <CardTitle>{t("information")}</CardTitle>
             </CardHeader>
@@ -862,6 +911,75 @@ export default function StudentDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Who asked for the termination — only once a contract is terminated. */}
+          {terminationInitiatorOf && (
+            <Card className="border-red-200/70 dark:border-red-900/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base text-red-600 dark:text-red-500">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  {t("terminatedByCardTitle")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Badge
+                  variant="secondary"
+                  className="bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400"
+                >
+                  {t(terminationInitiatorKey(terminationInitiatorOf))}
+                </Badge>
+
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 shrink-0 rounded-full bg-muted flex items-center justify-center font-bold">
+                    {terminationInitiatorPerson?.name?.charAt(0) || (
+                      <User className="w-4 h-4" />
+                    )}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-sm font-semibold truncate">
+                      {terminationInitiatorPerson?.name ||
+                        t("terminationInitiatorUnknown")}
+                    </span>
+                    {terminationInitiatorPerson?.role && (
+                      <span className="text-xs text-muted-foreground truncate">
+                        {terminationInitiatorPerson.role}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {terminationInitiatorPerson?.phone && (
+                  <a
+                    href={`tel:${terminationInitiatorPerson.phone.replace(/\D/g, "")}`}
+                    className="flex items-center gap-2 text-sm font-mono text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Phone className="w-4 h-4" />
+                    {terminationInitiatorPerson.phone}
+                  </a>
+                )}
+
+                {terminatedContract && (
+                  <div className="space-y-1 border-t border-border/50 pt-3 text-xs text-muted-foreground">
+                    <div className="flex justify-between gap-2">
+                      <span>{t("contractNumber")}</span>
+                      <span className="font-mono">
+                        {terminatedContract.contract_number}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span>{t("terminatedAt")}</span>
+                      <span>
+                        {format(
+                          new Date(terminatedContract.terminated_at!),
+                          "dd.MM.yyyy HH:mm",
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* RIGHT COLUMN: PARENTS & GUARDIANS */}
@@ -1440,30 +1558,36 @@ export default function StudentDetailPage() {
           <div className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
             <div className="space-y-2">
               <label
-                htmlFor="termination_reason"
+                htmlFor="termination_initiator"
                 className="flex items-center justify-between text-sm font-medium"
               >
                 <span className="inline-flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  {t("terminationReason")}
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  {t("terminationInitiator")}
                 </span>
                 <span className="text-xs text-red-500">*</span>
               </label>
 
-              <input
-                id="termination_reason"
-                value={terminationReason}
-                onChange={(e) => setTerminationReason(e.target.value)}
-                placeholder={t("reason")}
-                className="
-                  h-11 w-full rounded-xl border border-border bg-background px-4
-                  text-base text-foreground shadow-sm outline-none transition sm:text-sm
-                  focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary/40
-                "
-              />
+              <Select
+                id="termination_initiator"
+                value={terminationInitiator}
+                onChange={(e) =>
+                  setTerminationInitiator(
+                    e.target.value as TerminationInitiator | "",
+                  )
+                }
+                className="h-11 rounded-xl px-4 text-base sm:text-sm"
+              >
+                <option value="">{t("selectTerminationInitiator")}</option>
+                {TERMINATION_INITIATORS.map((initiator) => (
+                  <option key={initiator} value={initiator}>
+                    {t(terminationInitiatorKey(initiator))}
+                  </option>
+                ))}
+              </Select>
 
               <p className="text-xs text-muted-foreground">
-                {t("terminateContractDescription")}
+                {t("terminationInitiatorDescription")}
               </p>
             </div>
 
@@ -1512,8 +1636,8 @@ export default function StudentDetailPage() {
                 onClick={() => {
                   if (!activeContract) return;
 
-                  if (!terminationReason.trim()) {
-                    toast.error(t("reason"));
+                  if (!terminationInitiator) {
+                    toast.error(t("selectTerminationInitiator"));
                     return;
                   }
                   if (!terminatedAt) {
@@ -1523,7 +1647,9 @@ export default function StudentDetailPage() {
 
                   terminateContractMutation.mutate({
                     contractId: activeContract.id,
-                    termination_reason: terminationReason.trim(),
+                    // The initiator travels in the reason field the backend
+                    // already has — see lib/termination.
+                    termination_reason: terminationInitiator,
                     terminated_at: terminatedAt,
                   });
                 }}

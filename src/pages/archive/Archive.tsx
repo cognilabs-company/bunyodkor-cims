@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/table";
 import { useLanguageStore } from "@/store/languageStore";
 import { formatFullName } from "@/lib/name-utils";
+import { formatTerminationReason } from "@/lib/termination";
 import { BackupSection } from "@/pages/settings/Backup";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -386,9 +387,9 @@ export default function Archive() {
                           </TableCell>
                           <TableCell
                             className="max-w-[200px] truncate"
-                            title={contract.termination_reason || ""}
+                            title={formatTerminationReason(contract.termination_reason, t)}
                           >
-                            {contract.termination_reason ||
+                            {formatTerminationReason(contract.termination_reason, t) ||
                               (t("reasonNotProvided" as any) ||
                                 "Reason not provided")}
                           </TableCell>

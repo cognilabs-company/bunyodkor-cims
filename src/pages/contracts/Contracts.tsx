@@ -48,6 +48,7 @@ import {
   buildSearchEntry,
   rankSearch,
 } from "@/lib/search-utils";
+import { formatTerminationReason } from "@/lib/termination";
 import {
   formatFullName,
   formatGroupSelectLabel,
@@ -1066,7 +1067,12 @@ export default function Contracts() {
                               <TableCell>
                                 {getCoachNameForGroup(item.student_group_id)}
                               </TableCell>
-                              <TableCell>{item.termination_reason || "-"}</TableCell>
+                              <TableCell>
+                                {formatTerminationReason(
+                                  item.termination_reason,
+                                  t,
+                                ) || "-"}
+                              </TableCell>
                               <TableCell className="text-right">
                                 {!isReadOnly && (
                                   <Button
