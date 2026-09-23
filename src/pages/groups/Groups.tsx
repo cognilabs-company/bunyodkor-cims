@@ -27,6 +27,7 @@ import {
   userService,
   studentService,
   yearLimitService,
+  reportService,
 } from "@/services/api.service";
 import {
   Plus,
@@ -44,6 +45,7 @@ import {
   TrendingUp,
   Download,
 } from "lucide-react";
+import { format } from "date-fns";
 import toast from "react-hot-toast";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useLanguageStore } from "@/store/languageStore";
@@ -489,6 +491,37 @@ export default function Groups() {
     }
   };
 
+  // Same management workbook the Reports page offers, for the month running
+  // now — the Groups page carries no period filter of its own.
+  const handleGroupedDebtorsExport = async () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+
+    const promise = (async () => {
+      const blob = await reportService.exportGroupedDebtorsExcel({
+        year,
+        month,
+      });
+      if (!blob || blob.size === 0) {
+        throw new Error("NO_DATA");
+      }
+      downloadFile(
+        blob,
+        `grouped-debtors-statistics-${year}-${month}-${format(now, "yyyy-MM-dd")}.xlsx`,
+      );
+    })();
+
+    toast.promise(promise, {
+      loading: t("exportingData"),
+      success: t("exportedSuccessfully"),
+      error: (error: Error) =>
+        error.message === "NO_DATA"
+          ? t("noDataToExport")
+          : t("errorExportingData"),
+    });
+  };
+
   return (
     <div className="space-y-6 p-4 md:p-6">
       <motion.div
@@ -502,12 +535,22 @@ export default function Groups() {
           </h1>
           <p className="text-muted-foreground mt-1">{t("manageGroups")}</p>
         </div>
-        {!isReadOnly && (
-          <Button onClick={() => handleOpenDialog()} className="gap-2">
-            <Plus className="w-4 h-4" />
-            {t("newGroup")}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleGroupedDebtorsExport}
+          >
+            <Download className="w-4 h-4" />
+            {t("managementStatisticsExport")}
           </Button>
-        )}
+          {!isReadOnly && (
+            <Button onClick={() => handleOpenDialog()} className="gap-2">
+              <Plus className="w-4 h-4" />
+              {t("newGroup")}
+            </Button>
+          )}
+        </div>
       </motion.div>
 
       {/* Group Statistics Cards */}

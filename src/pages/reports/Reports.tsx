@@ -281,13 +281,6 @@ export default function Reports() {
     return params;
   };
 
-  const getDebtorsExportParams = () => ({
-    group_id: selectedGroupId || undefined,
-    min_debt_amount: minDebtAmount === "" ? undefined : Number(minDebtAmount),
-    year: unpaidYear === "" ? undefined : Number(unpaidYear),
-    month: effectiveMonth,
-  });
-
   const { data: debtorsData, isLoading: isDebtorsBaseLoading } = useQuery({
     queryKey: [
       "debtors-report",
@@ -604,26 +597,6 @@ export default function Reports() {
     [attendanceChartGroups],
   );
 
-  const handleDebtorsExport = async () => {
-    const promise = (async () => {
-      const blob = await reportService.exportDebtorsReport(
-        getDebtorsExportParams(),
-      );
-      if (!blob || blob.size === 0) {
-        throw new Error("NO_DATA");
-      }
-      const date = format(new Date(), "yyyy-MM-dd");
-      downloadFile(blob, `debtors-report-${date}.xlsx`);
-    })();
-
-    toast.promise(promise, {
-      loading: t("exportingData"),
-      success: t("exportedSuccessfully"),
-      error: (error: Error) =>
-        error.message === "NO_DATA" ? t("noDataToExport") : t("errorExportingData"),
-    });
-  };
-
   const handleGroupedDebtorsExport = async () => {
     const year = unpaidYear === "" ? undefined : Number(unpaidYear);
     const month = unpaidMonth === "" ? effectiveMonth : Number(unpaidMonth);
@@ -720,14 +693,13 @@ export default function Reports() {
               <Download className="w-4 h-4" />
               {t("managementStatisticsExport")}
             </Button>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={activeTab === "debtors" ? handleDebtorsExport : handleExport}
-            >
-              <Download className="w-4 h-4" />
-              {t("exportReport")}
-            </Button>
+            {/* The debtors tab exports through the management workbook only. */}
+            {activeTab !== "debtors" && (
+              <Button variant="outline" className="gap-2" onClick={handleExport}>
+                <Download className="w-4 h-4" />
+                {t("exportReport")}
+              </Button>
+            )}
           </div>
         )}
       </motion.div>
