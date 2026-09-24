@@ -492,23 +492,27 @@ export default function Groups() {
   };
 
   // Same management workbook the Reports page offers, for the month running
-  // now — the Groups page carries no period filter of its own.
-  const handleGroupedDebtorsExport = async () => {
+  // now — the Groups page carries no period filter of its own. Two modes off
+  // one endpoint: "general" is every student in each group, "debtors" only
+  // those who owe, with an amount column.
+  const handleGroupedDebtorsExport = async (mode: "general" | "debtors") => {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
+    const onlyDebtors = mode === "debtors";
 
     const promise = (async () => {
       const blob = await reportService.exportGroupedDebtorsExcel({
         year,
         month,
+        only_debtors: onlyDebtors,
       });
       if (!blob || blob.size === 0) {
         throw new Error("NO_DATA");
       }
       downloadFile(
         blob,
-        `grouped-debtors-statistics-${year}-${month}-${format(now, "yyyy-MM-dd")}.xlsx`,
+        `${onlyDebtors ? "grouped-debtors" : "grouped-students"}-${year}-${month}-${format(now, "yyyy-MM-dd")}.xlsx`,
       );
     })();
 
@@ -539,10 +543,18 @@ export default function Groups() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={handleGroupedDebtorsExport}
+            onClick={() => handleGroupedDebtorsExport("general")}
           >
             <Download className="w-4 h-4" />
-            {t("managementStatisticsExport")}
+            {t("groupedGeneralExport")}
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => handleGroupedDebtorsExport("debtors")}
+          >
+            <Download className="w-4 h-4" />
+            {t("groupedDebtorsExport")}
           </Button>
           {!isReadOnly && (
             <Button onClick={() => handleOpenDialog()} className="gap-2">

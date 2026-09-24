@@ -2119,17 +2119,30 @@ export const reportService = {
   },
 
   /**
-   * Export grouped debtors Excel for management statistics
+   * Export the grouped management workbook — one endpoint, two modes.
    * GET /reports/debtors/grouped-excel
+   *
+   * Omitted (or false) returns the GENERAL list: every student in every
+   * group, six columns, no amount. only_debtors=true returns just the
+   * students who owe, with a seventh amount column.
+   *
+   * The backend default is the general list, so the debtors mode has to
+   * send the flag explicitly — without it that button quietly downloads
+   * the general workbook instead, which still looks like it worked.
    */
   exportGroupedDebtorsExcel: async (params: {
     year: number;
     month: number;
+    only_debtors?: boolean;
   }): Promise<Blob> => {
     const response = await apiClient.get<Blob>(
       "/reports/debtors/grouped-excel",
       {
-        params,
+        params: {
+          year: params.year,
+          month: params.month,
+          ...(params.only_debtors ? { only_debtors: true } : {}),
+        },
         responseType: "blob",
       },
     );

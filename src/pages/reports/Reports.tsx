@@ -597,7 +597,9 @@ export default function Reports() {
     [attendanceChartGroups],
   );
 
-  const handleGroupedDebtorsExport = async () => {
+  // Two modes off one endpoint: "general" lists every student in each group,
+  // "debtors" only those who owe, with an amount column.
+  const handleGroupedDebtorsExport = async (mode: "general" | "debtors") => {
     const year = unpaidYear === "" ? undefined : Number(unpaidYear);
     const month = unpaidMonth === "" ? effectiveMonth : Number(unpaidMonth);
 
@@ -606,13 +608,20 @@ export default function Reports() {
       return;
     }
 
+    const onlyDebtors = mode === "debtors";
+
     const promise = (async () => {
-      const blob = await reportService.exportGroupedDebtorsExcel({ year, month });
+      const blob = await reportService.exportGroupedDebtorsExcel({
+        year,
+        month,
+        only_debtors: onlyDebtors,
+      });
       if (!blob || blob.size === 0) {
         throw new Error("NO_DATA");
       }
       const date = format(new Date(), "yyyy-MM-dd");
-      downloadFile(blob, `grouped-debtors-statistics-${year}-${month}-${date}.xlsx`);
+      const prefix = onlyDebtors ? "grouped-debtors" : "grouped-students";
+      downloadFile(blob, `${prefix}-${year}-${month}-${date}.xlsx`);
     })();
 
     toast.promise(promise, {
@@ -688,10 +697,18 @@ export default function Reports() {
             <Button
               variant="outline"
               className="gap-2"
-              onClick={handleGroupedDebtorsExport}
+              onClick={() => handleGroupedDebtorsExport("general")}
             >
               <Download className="w-4 h-4" />
-              {t("managementStatisticsExport")}
+              {t("groupedGeneralExport")}
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => handleGroupedDebtorsExport("debtors")}
+            >
+              <Download className="w-4 h-4" />
+              {t("groupedDebtorsExport")}
             </Button>
             {/* The debtors tab exports through the management workbook only. */}
             {activeTab !== "debtors" && (

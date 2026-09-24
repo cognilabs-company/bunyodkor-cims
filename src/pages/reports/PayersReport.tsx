@@ -193,7 +193,9 @@ const PayersReport: FC = () => {
     });
   };
 
-  const handleGroupedDebtorsExport = async () => {
+  // Two modes off one endpoint: "general" lists every student in each group,
+  // "debtors" only those who owe, with an amount column.
+  const handleGroupedDebtorsExport = async (mode: "general" | "debtors") => {
     const year = paymentYear === "" ? undefined : Number(paymentYear);
     const month = paymentMonth === "" ? undefined : Number(paymentMonth);
 
@@ -202,15 +204,22 @@ const PayersReport: FC = () => {
       return;
     }
 
+    const onlyDebtors = mode === "debtors";
+
     const promise = (async () => {
-      const blob = await reportService.exportGroupedDebtorsExcel({ year, month });
+      const blob = await reportService.exportGroupedDebtorsExcel({
+        year,
+        month,
+        only_debtors: onlyDebtors,
+      });
 
       if (!blob || blob.size === 0) {
         throw new Error("NO_DATA");
       }
 
       const date = format(new Date(), "yyyy-MM-dd");
-      downloadFile(blob, `grouped-debtors-statistics-${year}-${month}-${date}.xlsx`);
+      const prefix = onlyDebtors ? "grouped-debtors" : "grouped-students";
+      downloadFile(blob, `${prefix}-${year}-${month}-${date}.xlsx`);
     })();
 
     toast.promise(promise, {
@@ -329,8 +338,11 @@ const PayersReport: FC = () => {
             </div>
 
             <div className="ml-auto flex gap-2">
-              <Button onClick={handleGroupedDebtorsExport}>
-                {t("managementStatisticsExport")}
+              <Button onClick={() => handleGroupedDebtorsExport("general")}>
+                {t("groupedGeneralExport")}
+              </Button>
+              <Button onClick={() => handleGroupedDebtorsExport("debtors")}>
+                {t("groupedDebtorsExport")}
               </Button>
               <Button onClick={handleExport}>{t("exportReport")}</Button>
             </div>
