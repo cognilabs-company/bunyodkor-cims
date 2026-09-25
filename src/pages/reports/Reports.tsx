@@ -694,24 +694,28 @@ export default function Reports() {
         </div>
         {activeTab !== "payers" && activeTab !== "terminated" && (
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => handleGroupedDebtorsExport("general")}
-            >
-              <Download className="w-4 h-4" />
-              {t("groupedGeneralExport")}
-            </Button>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => handleGroupedDebtorsExport("debtors")}
-            >
-              <Download className="w-4 h-4" />
-              {t("groupedDebtorsExport")}
-            </Button>
-            {/* The debtors tab exports through the management workbook only. */}
-            {activeTab !== "debtors" && (
+            {/* The grouped workbooks belong to the debtors tab; the finance
+                and attendance tabs export their own report only. */}
+            {activeTab === "debtors" ? (
+              <>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => handleGroupedDebtorsExport("general")}
+                >
+                  <Download className="w-4 h-4" />
+                  {t("groupedGeneralExport")}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => handleGroupedDebtorsExport("debtors")}
+                >
+                  <Download className="w-4 h-4" />
+                  {t("groupedDebtorsExport")}
+                </Button>
+              </>
+            ) : (
               <Button variant="outline" className="gap-2" onClick={handleExport}>
                 <Download className="w-4 h-4" />
                 {t("exportReport")}

@@ -548,14 +548,6 @@ export default function Groups() {
             <Download className="w-4 h-4" />
             {t("groupedGeneralExport")}
           </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => handleGroupedDebtorsExport("debtors")}
-          >
-            <Download className="w-4 h-4" />
-            {t("groupedDebtorsExport")}
-          </Button>
           {!isReadOnly && (
             <Button onClick={() => handleOpenDialog()} className="gap-2">
               <Plus className="w-4 h-4" />
