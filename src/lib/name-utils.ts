@@ -53,6 +53,16 @@ export const formatFullName = (fullName?: NullableString) => {
   return [...restParts, firstPart].join(" ");
 };
 
+/**
+ * A staff name exactly as it is stored.
+ *
+ * `users.full_name` is one free-text field an administrator types surname
+ * first ("Karimov Aziz"), so unlike `formatFullName` nothing is reordered —
+ * rotating it would put the given name in front.
+ */
+export const formatStaffName = (fullName?: NullableString) =>
+  normalizePart(fullName).replace(/\s+/g, " ");
+
 export const formatPersonName = (person: NameLike) => {
   if (!person) return "";
 

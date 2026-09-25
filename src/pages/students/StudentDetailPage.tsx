@@ -46,7 +46,10 @@ import { invalidateYearLimits } from "@/hooks/useYearLimit";
 import { ArrowRightLeft } from "lucide-react";
 import { TransferStudentDialog } from "@/components/students/TransferStudentDialog";
 import { useLanguageStore } from "@/store/languageStore";
-import { formatFullName, formatNameParts } from "@/lib/name-utils";
+import {
+  formatNameParts,
+  formatStaffName,
+} from "@/lib/name-utils";
 import { Select } from "@/components/ui/select";
 import {
   TERMINATION_INITIATORS,
@@ -725,7 +728,7 @@ export default function StudentDetailPage() {
         }
       : terminationInitiatorOf === "coach"
         ? {
-            name: formatFullName(coach?.full_name),
+            name: formatStaffName(coach?.full_name),
             role: t("coach"),
             phone: coach?.phone || "",
           }
@@ -895,7 +898,7 @@ export default function StudentDetailPage() {
               <div className="flex justify-between items-center py-2.5 border-b border-border/50">
                 <span className="text-sm text-muted-foreground">{t("coach")}</span>
                 <span className="text-sm font-medium text-right">
-                  {formatFullName(coach?.full_name) || t("notAssigned")}
+                  {formatStaffName(coach?.full_name) || t("notAssigned")}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2.5 border-b border-border/50">
