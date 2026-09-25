@@ -2150,6 +2150,20 @@ export const reportService = {
   },
 
   /**
+   * Export the registration register — one row per contract of that year:
+   * the student, the contract, how it ended, the customer, and what was
+   * paid in each of the twelve months.
+   * GET /reports/registration-excel
+   */
+  exportRegistrationExcel: async (params: { year: number }): Promise<Blob> => {
+    const response = await apiClient.get<Blob>("/reports/registration-excel", {
+      params: { year: params.year },
+      responseType: "blob",
+    });
+    return response.data;
+  },
+
+  /**
    * Export Payments Excel
    * GET /reports/payments-excel
    */

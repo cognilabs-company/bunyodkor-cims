@@ -597,6 +597,35 @@ export default function Reports() {
     [attendanceChartGroups],
   );
 
+  // The registration register for one year: every contract of that year,
+  // however it ended, with its twelve monthly payment columns. The year is
+  // the only parameter the endpoint takes, so "all years" cannot be exported.
+  const handleRegistrationExport = async () => {
+    if (terminatedYear === "") {
+      toast.error(t("selectYearFirst"));
+      return;
+    }
+
+    const year = Number(terminatedYear);
+
+    const promise = (async () => {
+      const blob = await reportService.exportRegistrationExcel({ year });
+      if (!blob || blob.size === 0) {
+        throw new Error("NO_DATA");
+      }
+      downloadFile(blob, `registration_${year}.xlsx`);
+    })();
+
+    toast.promise(promise, {
+      loading: t("exportingData"),
+      success: t("exportedSuccessfully"),
+      error: (error: Error) =>
+        error.message === "NO_DATA"
+          ? t("noDataToExport")
+          : t("errorExportingData"),
+    });
+  };
+
   // Two modes off one endpoint: "general" lists every student in each group,
   // "debtors" only those who owe, with an amount column.
   const handleGroupedDebtorsExport = async (mode: "general" | "debtors") => {
@@ -1456,6 +1485,14 @@ export default function Reports() {
                   }}
                 >
                   {t("clearFilters")}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleRegistrationExport}
+                >
+                  <Download className="w-4 h-4" />
+                  {t("registrationReportExport")}
                 </Button>
               </div>
             </CardContent>
