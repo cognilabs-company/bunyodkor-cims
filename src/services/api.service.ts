@@ -1209,9 +1209,9 @@ export const contractService = {
   terminateContract: async (
     contractId: number,
     data: {
-      termination_reason: string;
+      terminated_by_type: string;
+      termination_reason?: string;
       terminated_at: string;
-      terminated_by_type?: string;
     },
   ): Promise<ApiResponse<ContractRead>> => {
     const response = await apiClient.post<ApiResponse<ContractRead>>(

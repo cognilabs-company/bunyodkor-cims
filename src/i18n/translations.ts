@@ -1097,8 +1097,8 @@
     // Per-birth-year enrolment limit
     yearLimits: "Year Limits",
     exportYearLimitsUsage: "Download Excel",
-    halfFilledGroups: "Groups at least 50% filled",
-    halfFilledGroupsShort: "50% filled",
+    halfFilledGroups: "Groups at least half full",
+    halfFilledGroupsShort: "Show only these",
     showAllGroups: "All groups",
     yearLimitsDescription:
       "One enrolment limit per birth year, shared by every group of that year.",
@@ -2258,8 +2258,8 @@
     // Yillik ro'yxatga olish limiti
     yearLimits: "Yillik limitlar",
     exportYearLimitsUsage: "Excel yuklab olish",
-    halfFilledGroups: "50% to'ldirilgan guruhlar",
-    halfFilledGroupsShort: "50% to'ldirilgan",
+    halfFilledGroups: "Yarmi to'lgan guruhlar",
+    halfFilledGroupsShort: "Faqat shularni ko'rish",
     showAllGroups: "Barcha guruhlar",
     yearLimitsDescription:
       "Har bir tug'ilgan yil uchun bitta umumiy limit — o'sha yildagi barcha guruhlarga taalluqli.",
@@ -3376,8 +3376,8 @@
     // Годовые лимиты набора
     yearLimits: "Годовые лимиты",
     exportYearLimitsUsage: "Скачать Excel",
-    halfFilledGroups: "Группы, заполненные на 50%",
-    halfFilledGroupsShort: "Заполнены на 50%",
+    halfFilledGroups: "Группы, заполненные наполовину",
+    halfFilledGroupsShort: "Показать только их",
     showAllGroups: "Все группы",
     yearLimitsDescription:
       "Один лимит на год рождения — общий для всех групп этого года.",

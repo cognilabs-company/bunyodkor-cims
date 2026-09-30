@@ -290,7 +290,7 @@ export default function StudentDetailPage() {
     }: {
       contractId: number;
       terminated_by_type: TerminationInitiator;
-      termination_reason: string;
+      termination_reason?: string;
       terminated_at: string;
     }) =>
       contractService.terminateContract(contractId, {
@@ -1707,7 +1707,7 @@ export default function StudentDetailPage() {
                     termination_reason:
                       terminationInitiator === "other"
                         ? terminationNote.trim()
-                        : terminationInitiator,
+                        : undefined,
                     terminated_at: terminatedAt,
                   });
                 }}
