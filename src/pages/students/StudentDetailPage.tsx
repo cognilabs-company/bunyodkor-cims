@@ -53,8 +53,9 @@ import {
 import { Select } from "@/components/ui/select";
 import {
   TERMINATION_INITIATORS,
-  parseTerminationInitiator,
+  resolveTerminationInitiator,
   terminationInitiatorKey,
+  terminationNoteOf,
   type TerminationInitiator,
 } from "@/lib/termination";
 import type {
@@ -137,6 +138,7 @@ export default function StudentDetailPage() {
   const [terminationInitiator, setTerminationInitiator] = useState<
     TerminationInitiator | ""
   >("");
+  const [terminationNote, setTerminationNote] = useState("");
   const [terminatedAt, setTerminatedAt] = useState(
     format(new Date(), "yyyy-MM-dd'T'HH:mm"),
   );
@@ -282,14 +284,17 @@ export default function StudentDetailPage() {
   const terminateContractMutation = useMutation({
     mutationFn: ({
       contractId,
+      terminated_by_type,
       termination_reason,
       terminated_at,
     }: {
       contractId: number;
+      terminated_by_type: TerminationInitiator;
       termination_reason: string;
       terminated_at: string;
     }) =>
       contractService.terminateContract(contractId, {
+        terminated_by_type,
         termination_reason,
         terminated_at: new Date(terminated_at).toISOString(),
       }),
@@ -303,6 +308,7 @@ export default function StudentDetailPage() {
       toast.success(t("contractUpdatedSuccess") || "Contract terminated");
       setIsTerminateDialogOpen(false);
       setTerminationInitiator("");
+      setTerminationNote("");
       setTerminatedAt(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
     },
     onError: (error: any) => {
@@ -706,9 +712,8 @@ export default function StudentDetailPage() {
           new Date(a.terminated_at!).getTime(),
       )[0] || null;
 
-  const terminationInitiatorOf = parseTerminationInitiator(
-    terminatedContract?.termination_reason,
-  );
+  const terminationInitiatorOf = resolveTerminationInitiator(terminatedContract);
+  const terminationNoteText = terminationNoteOf(terminatedContract);
 
   const contractCustomer =
     displayParents.find((p) => p.relationship_type === "Buyurtmachi") ||
@@ -933,24 +938,37 @@ export default function StudentDetailPage() {
                   {t(terminationInitiatorKey(terminationInitiatorOf))}
                 </Badge>
 
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 shrink-0 rounded-full bg-muted flex items-center justify-center font-bold">
-                    {terminationInitiatorPerson?.name?.charAt(0) || (
-                      <User className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-semibold truncate">
-                      {terminationInitiatorPerson?.name ||
-                        t("terminationInitiatorUnknown")}
-                    </span>
-                    {terminationInitiatorPerson?.role && (
-                      <span className="text-xs text-muted-foreground truncate">
-                        {terminationInitiatorPerson.role}
+                {terminationInitiatorOf !== "other" && (
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 shrink-0 rounded-full bg-muted flex items-center justify-center font-bold">
+                      {terminationInitiatorPerson?.name?.charAt(0) || (
+                        <User className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-semibold truncate">
+                        {terminationInitiatorPerson?.name ||
+                          t("terminationInitiatorUnknown")}
                       </span>
-                    )}
+                      {terminationInitiatorPerson?.role && (
+                        <span className="text-xs text-muted-foreground truncate">
+                          {terminationInitiatorPerson.role}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {terminationNoteText && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      {t("terminationNote")}
+                    </p>
+                    <p className="text-sm text-foreground break-words">
+                      {terminationNoteText}
+                    </p>
+                  </div>
+                )}
 
                 {terminationInitiatorPerson?.phone && (
                   <a
@@ -1595,6 +1613,33 @@ export default function StudentDetailPage() {
               </p>
             </div>
 
+            {terminationInitiator === "other" && (
+              <div className="space-y-2">
+                <label
+                  htmlFor="termination_note"
+                  className="flex items-center justify-between text-sm font-medium"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    {t("terminationNote")}
+                  </span>
+                  <span className="text-xs text-red-500">*</span>
+                </label>
+
+                <input
+                  id="termination_note"
+                  value={terminationNote}
+                  onChange={(e) => setTerminationNote(e.target.value)}
+                  placeholder={t("terminationNote")}
+                  className="
+                    h-11 w-full rounded-xl border border-border bg-background px-4
+                    text-base text-foreground shadow-sm outline-none transition sm:text-sm
+                    focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary/40
+                  "
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
               <label
                 htmlFor="terminated_at"
@@ -1644,6 +1689,13 @@ export default function StudentDetailPage() {
                     toast.error(t("selectTerminationInitiator"));
                     return;
                   }
+                  if (
+                    terminationInitiator === "other" &&
+                    !terminationNote.trim()
+                  ) {
+                    toast.error(t("terminationNoteRequired"));
+                    return;
+                  }
                   if (!terminatedAt) {
                     toast.error(t("terminatedAt"));
                     return;
@@ -1651,9 +1703,11 @@ export default function StudentDetailPage() {
 
                   terminateContractMutation.mutate({
                     contractId: activeContract.id,
-                    // The initiator travels in the reason field the backend
-                    // already has — see lib/termination.
-                    termination_reason: terminationInitiator,
+                    terminated_by_type: terminationInitiator,
+                    termination_reason:
+                      terminationInitiator === "other"
+                        ? terminationNote.trim()
+                        : terminationInitiator,
                     terminated_at: terminatedAt,
                   });
                 }}

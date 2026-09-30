@@ -811,6 +811,9 @@
     selectTerminationInitiator: "Select who asked",
     terminatedByParent: "By the parent (customer)",
     terminatedByCoach: "By the coach",
+    terminatedByOther: "Other",
+    terminationNote: "Note",
+    terminationNoteRequired: "Please write a note",
     terminatedByCardTitle: "Terminated By",
     terminationInitiatorUnknown: "Name not given",
     statisticsAndManagement: "Statistics and Management",
@@ -1093,6 +1096,10 @@
 
     // Per-birth-year enrolment limit
     yearLimits: "Year Limits",
+    exportYearLimitsUsage: "Download Excel",
+    halfFilledGroups: "Groups at least 50% filled",
+    halfFilledGroupsShort: "50% filled",
+    showAllGroups: "All groups",
     yearLimitsDescription:
       "One enrolment limit per birth year, shared by every group of that year.",
     newYearLimit: "New limit",
@@ -1958,6 +1965,9 @@
     selectTerminationInitiator: "Tashabbuskorni tanlang",
     terminatedByParent: "Ota-ona (buyurtmachi) tomonidan",
     terminatedByCoach: "Murabbiy tomonidan",
+    terminatedByOther: "Boshqa",
+    terminationNote: "Izoh",
+    terminationNoteRequired: "Iltimos, izoh yozing",
     terminatedByCardTitle: "Kim tomonidan bekor qilingan",
     terminationInitiatorUnknown: "Ismi ko'rsatilmagan",
     statisticsAndManagement: "Statistika va Boshqaruv",
@@ -2247,6 +2257,10 @@
 
     // Yillik ro'yxatga olish limiti
     yearLimits: "Yillik limitlar",
+    exportYearLimitsUsage: "Excel yuklab olish",
+    halfFilledGroups: "50% to'ldirilgan guruhlar",
+    halfFilledGroupsShort: "50% to'ldirilgan",
+    showAllGroups: "Barcha guruhlar",
     yearLimitsDescription:
       "Har bir tug'ilgan yil uchun bitta umumiy limit — o'sha yildagi barcha guruhlarga taalluqli.",
     newYearLimit: "Yangi limit",
@@ -3075,6 +3089,9 @@
     selectTerminationInitiator: "Выберите инициатора",
     terminatedByParent: "Родителем (заказчиком)",
     terminatedByCoach: "Тренером",
+    terminatedByOther: "Другое",
+    terminationNote: "Примечание",
+    terminationNoteRequired: "Пожалуйста, напишите примечание",
     terminatedByCardTitle: "Кем расторгнут",
     terminationInitiatorUnknown: "Имя не указано",
     statisticsAndManagement: "Статистика и Управление",
@@ -3358,6 +3375,10 @@
 
     // Годовые лимиты набора
     yearLimits: "Годовые лимиты",
+    exportYearLimitsUsage: "Скачать Excel",
+    halfFilledGroups: "Группы, заполненные на 50%",
+    halfFilledGroupsShort: "Заполнены на 50%",
+    showAllGroups: "Все группы",
     yearLimitsDescription:
       "Один лимит на год рождения — общий для всех групп этого года.",
     newYearLimit: "Новый лимит",

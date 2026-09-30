@@ -356,6 +356,28 @@ export type ContractStatus =
   | "terminated"
   | "archived";
 
+export type TerminatedByType = "parent" | "coach" | "other";
+
+export interface HalfFilledGroup {
+  group_id: number;
+  group_name: string;
+  identifier: string | null;
+  birth_year: number;
+  coach_id: number | null;
+  coach_name: string | null;
+  capacity: number | null;
+  active_students_count: number;
+  available_slots: number | null;
+  fill_percentage: number;
+  waiting_list_count: number;
+}
+
+export interface HalfFilledGroupsResponse {
+  cards: HalfFilledGroup[];
+  table: HalfFilledGroup[];
+  total: number;
+}
+
 export interface TerminatedByUser {
   id: number;
   full_name: string;
@@ -387,6 +409,7 @@ export interface ContractRead {
   terminated_at: string | null;
   terminated_by_user_id: number | null;
   termination_reason: string | null;
+  terminated_by_type: TerminatedByType | null;
   terminated_by: TerminatedByUser | null;
   created_at: string;
 }

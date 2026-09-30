@@ -1,42 +1,66 @@
-/**
- * Who asked for a contract to be terminated — the parent (the customer who
- * signed it) or the coach.
- *
- * The backend still stores one free-text `termination_reason`, so the choice
- * is written there as a token and read back with `parseTerminationInitiator`.
- * Contracts terminated before this change carry real free text and are shown
- * exactly as typed. `BACKEND_TERMINATION_INITIATOR.md` describes the column
- * that is meant to replace the token.
- */
-
-export type TerminationInitiator = "parent" | "coach";
+export type TerminationInitiator = "parent" | "coach" | "other";
 
 export const TERMINATION_INITIATORS: TerminationInitiator[] = [
   "parent",
   "coach",
+  "other",
 ];
 
-/** The stored initiator, or null when the reason is older free text. */
+export function isTerminationInitiator(
+  value: string | null | undefined,
+): value is TerminationInitiator {
+  return value === "parent" || value === "coach" || value === "other";
+}
+
 export function parseTerminationInitiator(
   reason: string | null | undefined,
 ): TerminationInitiator | null {
   const value = reason?.trim().toLowerCase();
-  return value === "parent" || value === "coach" ? value : null;
+  return isTerminationInitiator(value) ? value : null;
 }
 
-/** Translation key naming an initiator: parent → `terminatedByParent`. */
+export function resolveTerminationInitiator(contract: {
+  terminated_by_type?: string | null;
+  termination_reason?: string | null;
+} | null | undefined): TerminationInitiator | null {
+  if (!contract) return null;
+  if (isTerminationInitiator(contract.terminated_by_type)) {
+    return contract.terminated_by_type;
+  }
+  return parseTerminationInitiator(contract.termination_reason);
+}
+
 export function terminationInitiatorKey(initiator: TerminationInitiator) {
-  return initiator === "parent" ? "terminatedByParent" : "terminatedByCoach";
+  if (initiator === "parent") return "terminatedByParent";
+  if (initiator === "coach") return "terminatedByCoach";
+  return "terminatedByOther";
 }
 
-/**
- * How a stored reason reads in the current language: a token becomes its
- * label, older free text is returned as it was typed.
- */
+export function terminationNoteOf(contract: {
+  terminated_by_type?: string | null;
+  termination_reason?: string | null;
+} | null | undefined): string {
+  const note = contract?.termination_reason?.trim() || "";
+  return isTerminationInitiator(note) ? "" : note;
+}
+
 export function formatTerminationReason(
-  reason: string | null | undefined,
+  contract:
+    | string
+    | { terminated_by_type?: string | null; termination_reason?: string | null }
+    | null
+    | undefined,
   t: (key: string) => string,
 ): string {
-  const initiator = parseTerminationInitiator(reason);
-  return initiator ? t(terminationInitiatorKey(initiator)) : reason?.trim() || "";
+  const row =
+    typeof contract === "string" || contract === null || contract === undefined
+      ? { termination_reason: contract }
+      : contract;
+
+  const initiator = resolveTerminationInitiator(row);
+  const note = terminationNoteOf(row);
+
+  if (!initiator) return note;
+  if (initiator === "other") return note || t("terminatedByOther");
+  return t(terminationInitiatorKey(initiator));
 }

@@ -166,6 +166,7 @@ export default function Groups() {
   const [isStudentsDialogOpen, setIsStudentsDialogOpen] = useState(false);
   const [selectedGroupForStudents, setSelectedGroupForStudents] =
     useState<GroupRead | null>(null);
+  const [showHalfFilledOnly, setShowHalfFilledOnly] = useState(false);
   const [isContractsDialogOpen, setIsContractsDialogOpen] = useState(false);
   const [selectedGroupForContracts, setSelectedGroupForContracts] =
     useState<GroupRead | null>(null);
@@ -184,6 +185,20 @@ export default function Groups() {
     queryKey: ["groups-statistics"],
     queryFn: () => groupService.getGroupsStatistics(),
   });
+
+  const { data: halfFilledData, isLoading: isLoadingHalfFilled } = useQuery({
+    queryKey: ["groups-half-filled"],
+    queryFn: () => groupService.getHalfFilledGroups({ threshold: 50 }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const halfFilledGroupIds = React.useMemo(
+    () =>
+      new Set(
+        (halfFilledData?.data?.cards || []).map((group) => group.group_id),
+      ),
+    [halfFilledData],
+  );
 
   // Enrolment is capped per birth year, so each year heading carries its own
   // limit. One request covers every limited year; years missing from the map
@@ -210,18 +225,21 @@ export default function Groups() {
       (a, b) => a.birth_year - b.birth_year,
     );
 
-    if (!debouncedSearch) return byYear;
+    const matches = (group: GroupRead) => {
+      if (showHalfFilledOnly && !halfFilledGroupIds.has(group.id)) return false;
+      if (!debouncedSearch) return true;
+      return group.name
+        .toLowerCase()
+        .includes(debouncedSearch.toLowerCase());
+    };
+
+    if (!debouncedSearch && !showHalfFilledOnly) return byYear;
 
     return byYear
-      .map((yearData) => ({
-        ...yearData,
-        groups: yearData.groups.filter((group) =>
-          group.name.toLowerCase().includes(debouncedSearch.toLowerCase()),
-        ),
-        total_groups: yearData.groups.filter((group) =>
-          group.name.toLowerCase().includes(debouncedSearch.toLowerCase()),
-        ).length,
-      }))
+      .map((yearData) => {
+        const groups = yearData.groups.filter(matches);
+        return { ...yearData, groups, total_groups: groups.length };
+      })
       .filter((yearData) => yearData.groups.length > 0);
   };
 
@@ -562,7 +580,7 @@ export default function Groups() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
       >
         {/* Total Groups Card */}
         <Card className="bg-card border-border shadow-sm">
@@ -666,6 +684,43 @@ export default function Groups() {
                 (groupsStats?.data?.filled_groups_count ?? 0)
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card
+          role="button"
+          tabIndex={0}
+          aria-pressed={showHalfFilledOnly}
+          onClick={() => setShowHalfFilledOnly((shown) => !shown)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setShowHalfFilledOnly((shown) => !shown);
+            }
+          }}
+          className={`cursor-pointer bg-card shadow-sm transition-colors hover:border-primary/60 ${
+            showHalfFilledOnly ? "border-primary ring-2 ring-primary/30" : "border-border"
+          }`}
+        >
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {t("halfFilledGroups")}
+              </CardTitle>
+              <TrendingUp className="h-5 w-5 text-amber-500" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-foreground">
+              {isLoadingHalfFilled ? (
+                <Loader2 className="animate-spin w-8 h-8" />
+              ) : (
+                (halfFilledData?.data?.total ?? 0)
+              )}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {showHalfFilledOnly ? t("showAllGroups") : t("halfFilledGroupsShort")}
+            </p>
           </CardContent>
         </Card>
       </motion.div>

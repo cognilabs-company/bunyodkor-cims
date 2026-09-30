@@ -982,10 +982,7 @@ export default function Contracts() {
                                 {getCoachNameForGroup(item.student_group_id)}
                               </TableCell>
                               <TableCell>
-                                {formatTerminationReason(
-                                  item.termination_reason,
-                                  t,
-                                ) || "-"}
+                                {formatTerminationReason(item, t) || "-"}
                               </TableCell>
                               <TableCell className="text-right">
                                 {!isReadOnly && (

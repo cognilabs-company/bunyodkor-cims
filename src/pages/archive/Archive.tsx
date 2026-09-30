@@ -387,9 +387,9 @@ export default function Archive() {
                           </TableCell>
                           <TableCell
                             className="max-w-[200px] truncate"
-                            title={formatTerminationReason(contract.termination_reason, t)}
+                            title={formatTerminationReason(contract, t)}
                           >
-                            {formatTerminationReason(contract.termination_reason, t) ||
+                            {formatTerminationReason(contract, t) ||
                               (t("reasonNotProvided" as any) ||
                                 "Reason not provided")}
                           </TableCell>

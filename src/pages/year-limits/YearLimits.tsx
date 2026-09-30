@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import {
   CalendarRange,
+  Download,
   Edit,
   Loader2,
   Plus,
@@ -24,6 +25,8 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { yearLimitService } from "@/services/api.service";
+import { downloadFile } from "@/lib/export-utils";
+import { format } from "date-fns";
 import type { YearLimitUsage } from "@/types/api";
 import { useLanguageStore } from "@/store/languageStore";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -131,6 +134,28 @@ export default function YearLimits() {
     },
   ];
 
+  const handleExportUsage = async () => {
+    const promise = (async () => {
+      const blob = await yearLimitService.exportYearLimitsUsage();
+      if (!blob || blob.size === 0) {
+        throw new Error("NO_DATA");
+      }
+      downloadFile(
+        blob,
+        `year_limits_usage_${format(new Date(), "yyyy-MM-dd")}.xlsx`,
+      );
+    })();
+
+    toast.promise(promise, {
+      loading: t("exportingData"),
+      success: t("exportedSuccessfully"),
+      error: (error: Error) =>
+        error.message === "NO_DATA"
+          ? t("noDataToExport")
+          : t("errorExportingData"),
+    });
+  };
+
   return (
     <div className="space-y-6 p-4 md:p-6">
       <motion.div
@@ -146,12 +171,22 @@ export default function YearLimits() {
             {t("yearLimitsDescription")}
           </p>
         </div>
-        {canEdit && (
-          <Button onClick={() => handleOpenDialog(null)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            {t("newYearLimit")}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleExportUsage}
+          >
+            <Download className="w-4 h-4" />
+            {t("exportYearLimitsUsage")}
           </Button>
-        )}
+          {canEdit && (
+            <Button onClick={() => handleOpenDialog(null)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              {t("newYearLimit")}
+            </Button>
+          )}
+        </div>
       </motion.div>
 
       <motion.div

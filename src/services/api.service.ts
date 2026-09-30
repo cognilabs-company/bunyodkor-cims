@@ -92,6 +92,7 @@ import type {
   ApiResponse,
   SessionUpdateRequest,
   GroupsStatisticsResponse,
+  HalfFilledGroupsResponse,
   ContractWithStudentNameRead,
   TransactionWithNameRead,
   TerminatedStudentItem,
@@ -896,6 +897,22 @@ export const groupService = {
    * Get overall statistics for all groups.
    * GET /groups/statistics
    */
+  /**
+   * Groups filled to at least `threshold` percent.
+   * GET /groups/half-filled
+   */
+  getHalfFilledGroups: async (params?: {
+    archive_year?: number;
+    threshold?: number;
+    status?: string;
+  }): Promise<ApiResponse<HalfFilledGroupsResponse>> => {
+    const response = await apiClient.get<ApiResponse<HalfFilledGroupsResponse>>(
+      "/groups/half-filled",
+      { params },
+    );
+    return response.data;
+  },
+
   getGroupsStatistics: async (): Promise<
     ApiResponse<GroupsStatisticsResponse>
   > => {
@@ -1194,6 +1211,7 @@ export const contractService = {
     data: {
       termination_reason: string;
       terminated_at: string;
+      terminated_by_type?: string;
     },
   ): Promise<ApiResponse<ContractRead>> => {
     const response = await apiClient.post<ApiResponse<ContractRead>>(
@@ -2546,6 +2564,17 @@ export const yearLimitService = {
     const response = await apiClient.get<ApiResponse<YearLimitUsage[]>>(
       "/year-limits/usage",
     );
+    return response.data;
+  },
+
+  /**
+   * Year limit usage as an Excel workbook.
+   * GET /year-limits/usage/export
+   */
+  exportYearLimitsUsage: async (): Promise<Blob> => {
+    const response = await apiClient.get<Blob>("/year-limits/usage/export", {
+      responseType: "blob",
+    });
     return response.data;
   },
 
