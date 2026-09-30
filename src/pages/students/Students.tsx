@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -43,8 +43,12 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { studentService } from "@/services/api.service";
-import type { StudentRead } from "@/types/api";
+import {
+  studentService,
+  contractService,
+  fetchAllPages,
+} from "@/services/api.service";
+import type { ContractRead, StudentRead } from "@/types/api";
 import { StudentDialog } from "./StudentDialog";
 import { StudentWithContractDialog } from "./StudentWithContractDialog";
 import { exportStudents } from "@/lib/export-utils";
@@ -187,6 +191,44 @@ export default function Students() {
           : undefined,
       }),
   });
+
+  const { data: allContracts } = useQuery({
+    queryKey: ["contracts", "numbers-by-student"],
+    queryFn: () =>
+      fetchAllPages<ContractRead>((page, page_size) =>
+        contractService.getContracts({ page, page_size }),
+      ),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  const contractNumberByStudent = useMemo(() => {
+    const byStudent = new Map<number, ContractRead>();
+
+    for (const contract of allContracts || []) {
+      if (!contract.student_id) continue;
+
+      const current = byStudent.get(contract.student_id);
+      if (!current) {
+        byStudent.set(contract.student_id, contract);
+        continue;
+      }
+
+      const beatsOnStatus =
+        contract.status === "active" && current.status !== "active";
+      const sameStatus = (contract.status === "active") === (current.status === "active");
+      if (beatsOnStatus || (sameStatus && contract.id > current.id)) {
+        byStudent.set(contract.student_id, contract);
+      }
+    }
+
+    return new Map(
+      [...byStudent].map(([studentId, contract]) => [
+        studentId,
+        contract.contract_number,
+      ]),
+    );
+  }, [allContracts]);
 
   // Get total count for each status (independent of pagination)
   const { data: activeCountData } = useQuery({
@@ -690,17 +732,14 @@ export default function Students() {
                           >
                             {formatNameParts(student.last_name, student.first_name)}
                           </Link>
-                          <p className="text-sm text-muted-foreground md:hidden truncate">
-                            {student.phone}
-                          </p>
-                          {student.created_at && (
-                            <p className="text-xs text-muted-foreground/70 truncate">
-                              {format(
-                                new Date(student.created_at),
-                                "dd-MM-yyyy",
-                              )}
+                          {contractNumberByStudent.get(student.id) && (
+                            <p className="text-xs font-mono text-muted-foreground truncate">
+                              {contractNumberByStudent.get(student.id)}
                             </p>
                           )}
+                          <p className="text-sm text-muted-foreground truncate">
+                            {student.phone}
+                          </p>
                         </div>
                       </div>
                     </TableCell>

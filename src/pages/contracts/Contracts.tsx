@@ -42,7 +42,6 @@ import { useGroupsStore } from "@/store/groupsStore";
 import { useLanguageStore } from "@/store/languageStore";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePermissions } from "@/hooks/usePermissions";
-import { downloadFile } from "@/lib/export-utils";
 import { compareContractsNewestFirst } from "@/lib/contract-order";
 import {
   buildSearchEntry,
@@ -58,7 +57,6 @@ import { ContractDialog } from "./ContractDialog";
 import type {
   ContractWithStudentNameRead,
   TerminatedStudentItem,
-  TerminatedUnpaidReportItem,
 } from "@/types/api";
 import {
   CalendarDays,
@@ -67,7 +65,6 @@ import {
   ChevronRight,
   ChevronUp,
   CreditCard,
-  Download,
   Edit,
   FileText,
   Loader2,
@@ -78,7 +75,7 @@ import {
   X,
 } from "lucide-react";
 
-type ContractsView = "contracts" | "terminated-students" | "terminated-unpaid";
+type ContractsView = "contracts" | "terminated-students";
 
 const CONTRACTS_PAGE_SIZE = 10;
 
@@ -331,7 +328,7 @@ export default function Contracts() {
       reportService.getTerminatedSummary({
         // params if needed based on the endpoint, but API docs didn't specify date range params for this one
       }),
-    enabled: view === "terminated-students" || view === "terminated-unpaid",
+    enabled: view === "terminated-students",
   });
 
   const terminatedStudentsQuery = useQuery({
@@ -358,30 +355,6 @@ export default function Contracts() {
     enabled: view === "terminated-students",
   });
 
-  const terminatedUnpaidQuery = useQuery({
-    queryKey: [
-      "contracts-terminated-unpaid",
-      page,
-      debouncedSearch,
-      groupFilter,
-      archiveYearFilter,
-      terminatedFrom,
-      terminatedTo,
-      view,
-    ],
-    queryFn: () =>
-      contractService.getTerminatedUnpaidReport({
-        archive_year: archiveYearFilter,
-        group_id: groupFilter,
-        search: debouncedSearch || undefined,
-        terminated_from: terminatedFrom || undefined,
-        terminated_to: terminatedTo || undefined,
-        page,
-        page_size: 10,
-      }),
-    enabled: view === "terminated-unpaid",
-  });
-
   const { data: groupData } = useQuery({
     queryKey: ["group", groupFilter],
     queryFn: () => groupService.getGroup(groupFilter!),
@@ -389,18 +362,12 @@ export default function Contracts() {
   });
 
   const currentData =
-    view === "contracts"
-      ? contractsPageData
-      : view === "terminated-students"
-        ? terminatedStudentsQuery.data
-        : terminatedUnpaidQuery.data;
+    view === "contracts" ? contractsPageData : terminatedStudentsQuery.data;
 
   const isLoading =
     view === "contracts"
       ? contractsQuery.isLoading
-      : view === "terminated-students"
-        ? terminatedStudentsQuery.isLoading
-        : terminatedUnpaidQuery.isLoading;
+      : terminatedStudentsQuery.isLoading;
 
   const handleOpenDialog = (contract?: ContractWithStudentNameRead) => {
     setSelectedContract(contract || null);
@@ -412,9 +379,6 @@ export default function Contracts() {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["contracts-terminated-students"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["contracts-terminated-unpaid"],
       });
       queryClient.invalidateQueries({ queryKey: ["students"] });
       queryClient.invalidateQueries({ queryKey: ["students-count"] });
@@ -543,34 +507,6 @@ export default function Contracts() {
     navigate(`/students/${studentId}`);
   };
 
-  const handleExportTerminatedUnpaid = async () => {
-    const promise = (async () => {
-      const blob = await contractService.exportTerminatedUnpaidReport({
-        archive_year: archiveYearFilter,
-        group_id: groupFilter,
-        search: debouncedSearch || undefined,
-        terminated_from: terminatedFrom || undefined,
-        terminated_to: terminatedTo || undefined,
-      });
-
-      if (!blob || blob.size === 0) {
-        throw new Error("NO_DATA");
-      }
-
-      const date = format(new Date(), "yyyy-MM-dd");
-      downloadFile(blob, `terminated-unpaid-report-${date}.xlsx`);
-    })();
-
-    toast.promise(promise, {
-      loading: t("exportingData"),
-      success: t("reportExported"),
-      error: (error: Error) =>
-        error.message === "NO_DATA"
-          ? t("noDataToExport")
-          : t("failedToExportReport"),
-    });
-  };
-
   const totalPages = currentData?.meta?.total_pages || 1;
 
   const getPaginationItems = () => {
@@ -624,18 +560,6 @@ export default function Contracts() {
           >
             {t("terminatedStudents")}
           </Button>
-          <Button
-            variant={view === "terminated-unpaid" ? "default" : "outline"}
-            onClick={() => handleViewChange("terminated-unpaid")}
-          >
-            {t("terminatedUnpaidReport")}
-          </Button>
-          {view === "terminated-unpaid" && (
-            <Button variant="outline" onClick={handleExportTerminatedUnpaid}>
-              <Download className="w-4 h-4 mr-2" />
-              {t("exportReport")}
-            </Button>
-          )}
         </div>
       </motion.div>
 
@@ -831,9 +755,7 @@ export default function Contracts() {
             <CardTitle className="text-lg flex flex-wrap items-center gap-2">
               {view === "contracts"
                 ? t("contractsList")
-                : view === "terminated-students"
-                  ? t("terminatedStudents")
-                  : t("terminatedUnpaidReport")}
+                : t("terminatedStudents")}
               {/* How many rows the current filters and search leave. */}
               {view === "contracts" && contractsQuery.data && (
                 <Badge variant="secondary" className="font-semibold">
@@ -892,7 +814,7 @@ export default function Contracts() {
                           {t("actions")}
                         </TableHead>
                       </>
-                    ) : view === "terminated-students" ? (
+                    ) : (
                       <>
                         <TableHead>{t("group")}</TableHead>
                         <TableHead>{t("terminatedAt")}</TableHead>
@@ -901,14 +823,6 @@ export default function Contracts() {
                         <TableHead className="text-right [&>div]:justify-end">
                           {t("actions")}
                         </TableHead>
-                      </>
-                    ) : (
-                      <>
-                        <TableHead>{t("group")}</TableHead>
-                        <TableHead>{t("terminatedAt")}</TableHead>
-                        <TableHead>{t("paid") || "Paid"}</TableHead>
-                        <TableHead>{t("unpaid") || "Unpaid"}</TableHead>
-                        <TableHead>{t("coach")}</TableHead>
                       </>
                     )}
                   </TableRow>
@@ -1009,7 +923,7 @@ export default function Contracts() {
                         description={t("contractsCreatedHere")}
                       />
                     )
-                  ) : view === "terminated-students" ? (
+                  ) : (
                     currentData?.data && currentData.data.length > 0 ? (
                       (currentData.data as TerminatedStudentItem[]).map((item) => {
                         const isExpanded =
@@ -1267,49 +1181,6 @@ export default function Contracts() {
                         description={t("noTerminatedStudents")}
                       />
                     )
-                  ) : currentData?.data && currentData.data.length > 0 ? (
-                    (currentData.data as TerminatedUnpaidReportItem[]).map((item) => (
-                      <TableRow key={item.contract_id}>
-                        <TableCell>{item.contract_number}</TableCell>
-                        <TableCell>
-                          <div
-                            className="flex items-center gap-2 cursor-pointer group select-none"
-                            onClick={() => handleOpenStudentDetail(item.student_id)}
-                          >
-                            <User className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                            <span className="font-medium text-foreground group-hover:text-primary group-hover:underline transition-colors">
-                              {formatNameParts(
-                                item.student_last_name,
-                                item.student_first_name,
-                              ) || "-"}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {item.contract_group_name ||
-                            item.current_student_group_name ||
-                            "-"}
-                        </TableCell>
-                        <TableCell>
-                          {item.terminated_at
-                            ? format(new Date(item.terminated_at), "MMM d, yyyy HH:mm")
-                            : "-"}
-                        </TableCell>
-                        <TableCell>{item.paid_months_count}</TableCell>
-                        <TableCell>{item.unpaid_months_count}</TableCell>
-                        <TableCell>
-                          {getCoachNameForGroup(
-                            item.contract_group_id ?? item.current_student_group_id,
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableEmpty
-                      icon={<FileText className="w-12 h-12" />}
-                      title={t("noDataToExport")}
-                      description={t("noTerminatedUnpaidData")}
-                    />
                   )}
                 </TableBody>
               </Table>
