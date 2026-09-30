@@ -28,6 +28,7 @@ import {
   studentService,
   yearLimitService,
   reportService,
+  contractService,
 } from "@/services/api.service";
 import {
   Plus,
@@ -167,6 +168,7 @@ export default function Groups() {
   const [selectedGroupForStudents, setSelectedGroupForStudents] =
     useState<GroupRead | null>(null);
   const [showHalfFilledOnly, setShowHalfFilledOnly] = useState(false);
+  const [showHalfPayers, setShowHalfPayers] = useState(false);
   const [isContractsDialogOpen, setIsContractsDialogOpen] = useState(false);
   const [selectedGroupForContracts, setSelectedGroupForContracts] =
     useState<GroupRead | null>(null);
@@ -191,6 +193,57 @@ export default function Groups() {
     queryFn: () => groupService.getHalfFilledGroups({ threshold: 50 }),
     staleTime: 5 * 60 * 1000,
   });
+
+  const { data: feeContracts, isLoading: isLoadingFees } = useQuery({
+    queryKey: ["contracts", "fees-with-name"],
+    queryFn: () =>
+      contractService.getAllContractsWithStudentName({ status: "active" }),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  const groupById = React.useMemo(() => {
+    const map = new Map<number, GroupRead>();
+    for (const yearGroup of groupedData?.data || []) {
+      for (const group of yearGroup.groups || []) {
+        if (group?.id) map.set(group.id, group);
+      }
+    }
+    return map;
+  }, [groupedData]);
+
+  const feeBreakdown = React.useMemo(() => {
+    const rows = (feeContracts || []).filter(
+      (contract) => Number(contract.monthly_fee) > 0,
+    );
+
+    const counts = new Map<number, number>();
+    for (const contract of rows) {
+      const fee = Number(contract.monthly_fee);
+      counts.set(fee, (counts.get(fee) || 0) + 1);
+    }
+
+    let standardFee = 0;
+    let best = -1;
+    for (const [fee, count] of counts) {
+      if (count > best || (count === best && fee > standardFee)) {
+        best = count;
+        standardFee = fee;
+      }
+    }
+
+    const halfPayers = rows
+      .filter((contract) => Number(contract.monthly_fee) < standardFee)
+      .sort(
+        (a, b) =>
+          Number(a.monthly_fee) - Number(b.monthly_fee) ||
+          formatFullName(a.student_full_name).localeCompare(
+            formatFullName(b.student_full_name),
+          ),
+      );
+
+    return { standardFee, halfPayers };
+  }, [feeContracts]);
 
   const halfFilledGroupIds = React.useMemo(
     () =>
@@ -691,10 +744,14 @@ export default function Groups() {
           role="button"
           tabIndex={0}
           aria-pressed={showHalfFilledOnly}
-          onClick={() => setShowHalfFilledOnly((shown) => !shown)}
+          onClick={() => {
+            setShowHalfPayers(false);
+            setShowHalfFilledOnly((shown) => !shown);
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
+              setShowHalfPayers(false);
               setShowHalfFilledOnly((shown) => !shown);
             }
           }}
@@ -720,6 +777,56 @@ export default function Groups() {
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               {showHalfFilledOnly ? t("showAllGroups") : t("halfFilledGroupsShort")}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card
+          role="button"
+          tabIndex={0}
+          aria-pressed={showHalfPayers}
+          onClick={() => {
+            setShowHalfFilledOnly(false);
+            setShowHalfPayers((shown) => !shown);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setShowHalfFilledOnly(false);
+              setShowHalfPayers((shown) => !shown);
+            }
+          }}
+          className={`cursor-pointer bg-card shadow-sm transition-colors hover:border-primary/60 ${
+            showHalfPayers ? "border-primary ring-2 ring-primary/30" : "border-border"
+          }`}
+        >
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {t("halfPayingStudents")}
+              </CardTitle>
+              <CreditCard className="h-5 w-5 text-rose-500" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-foreground">
+              {isLoadingFees ? (
+                <Loader2 className="animate-spin w-8 h-8" />
+              ) : (
+                feeBreakdown.halfPayers.length
+              )}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {showHalfPayers
+                ? t("showAllGroups")
+                : t("halfPayingStudentsHint").replace(
+                    "{{fee}}",
+                    feeBreakdown.standardFee
+                      ? new Intl.NumberFormat("uz-UZ").format(
+                          feeBreakdown.standardFee,
+                        )
+                      : "-",
+                  )}
             </p>
           </CardContent>
         </Card>
@@ -753,7 +860,99 @@ export default function Groups() {
         </Card>
       </motion.div>
 
-      {isLoading ? (
+      {showHalfPayers ? (
+        <Card className="border-border/50 shadow-md">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold text-foreground flex flex-wrap items-center gap-x-3 gap-y-2">
+              <CreditCard className="w-6 h-6 shrink-0" />
+              <span>{t("halfPayingStudents")}</span>
+              <Badge variant="secondary" className="font-semibold">
+                {feeBreakdown.halfPayers.length}
+              </Badge>
+              {feeBreakdown.standardFee > 0 && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  {t("halfPayingStudentsHint").replace(
+                    "{{fee}}",
+                    new Intl.NumberFormat("uz-UZ").format(
+                      feeBreakdown.standardFee,
+                    ),
+                  )}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingFees ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : feeBreakdown.halfPayers.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                {t("halfPayingStudentsEmpty")}
+              </p>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {feeBreakdown.halfPayers.map((contract) => {
+                  const group: any = groupById.get(contract.group_id);
+                  const share = feeBreakdown.standardFee
+                    ? Math.round(
+                        (Number(contract.monthly_fee) /
+                          feeBreakdown.standardFee) *
+                          100,
+                      )
+                    : null;
+
+                  return (
+                    <Card
+                      key={contract.id}
+                      className="border-border/60 transition-shadow hover:shadow-md"
+                    >
+                      <CardContent className="space-y-3 p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-semibold text-foreground">
+                            {formatFullName(contract.student_full_name) || "-"}
+                          </p>
+                          <Badge variant="outline" className="font-mono shrink-0">
+                            {contract.contract_number}
+                          </Badge>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge
+                            variant="secondary"
+                            className="bg-rose-50 font-semibold text-rose-600 dark:bg-rose-900/20 dark:text-rose-400"
+                          >
+                            {new Intl.NumberFormat("uz-UZ").format(
+                              Number(contract.monthly_fee),
+                            )}{" "}
+                            UZS
+                          </Badge>
+                          {share !== null && (
+                            <span className="text-xs text-muted-foreground">
+                              {share}%
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <Users className="h-3.5 w-3.5" />
+                            {group?.name || t("noGroup")}
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5" />
+                            {contract.birth_year || group?.birth_year || "-"}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>

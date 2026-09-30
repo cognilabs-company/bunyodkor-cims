@@ -1097,8 +1097,12 @@
     // Per-birth-year enrolment limit
     yearLimits: "Year Limits",
     exportYearLimitsUsage: "Download Excel",
-    halfFilledGroups: "Groups at least half full",
+    halfFilledGroups: "Groups 50%+ full",
     halfFilledGroupsShort: "Show only these",
+    halfPayingStudents: "Half-fee students",
+    halfPayingStudentsHint: "Full fee: {{fee}}",
+    halfPayingStudentsEmpty: "No student pays less than the full fee.",
+    standardFee: "Full fee",
     showAllGroups: "All groups",
     yearLimitsDescription:
       "One enrolment limit per birth year, shared by every group of that year.",
@@ -2258,8 +2262,12 @@
     // Yillik ro'yxatga olish limiti
     yearLimits: "Yillik limitlar",
     exportYearLimitsUsage: "Excel yuklab olish",
-    halfFilledGroups: "Yarmi to'lgan guruhlar",
+    halfFilledGroups: "Sig'imi 50%+ band guruhlar",
     halfFilledGroupsShort: "Faqat shularni ko'rish",
+    halfPayingStudents: "Yarim to'lov qiluvchilar",
+    halfPayingStudentsHint: "To'liq to'lov: {{fee}}",
+    halfPayingStudentsEmpty: "To'liq to'lovdan kam to'laydigan o'quvchi yo'q.",
+    standardFee: "To'liq to'lov",
     showAllGroups: "Barcha guruhlar",
     yearLimitsDescription:
       "Har bir tug'ilgan yil uchun bitta umumiy limit — o'sha yildagi barcha guruhlarga taalluqli.",
@@ -3376,8 +3384,12 @@
     // Годовые лимиты набора
     yearLimits: "Годовые лимиты",
     exportYearLimitsUsage: "Скачать Excel",
-    halfFilledGroups: "Группы, заполненные наполовину",
+    halfFilledGroups: "Группы, заполненные на 50%+",
     halfFilledGroupsShort: "Показать только их",
+    halfPayingStudents: "Платят половину",
+    halfPayingStudentsHint: "Полная оплата: {{fee}}",
+    halfPayingStudentsEmpty: "Нет учеников, платящих меньше полной оплаты.",
+    standardFee: "Полная оплата",
     showAllGroups: "Все группы",
     yearLimitsDescription:
       "Один лимит на год рождения — общий для всех групп этого года.",
