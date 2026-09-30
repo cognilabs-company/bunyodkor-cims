@@ -633,7 +633,7 @@ export default function Groups() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
       >
         {/* Total Groups Card */}
         <Card className="bg-card border-border shadow-sm">
@@ -739,97 +739,104 @@ export default function Groups() {
             </div>
           </CardContent>
         </Card>
+      </motion.div>
 
-        <Card
-          role="button"
-          tabIndex={0}
-          aria-pressed={showHalfFilledOnly}
-          onClick={() => {
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="grid gap-4 sm:grid-cols-2"
+      >
+      <Card
+        role="button"
+        tabIndex={0}
+        aria-pressed={showHalfFilledOnly}
+        onClick={() => {
+          setShowHalfPayers(false);
+          setShowHalfFilledOnly((shown) => !shown);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
             setShowHalfPayers(false);
             setShowHalfFilledOnly((shown) => !shown);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              setShowHalfPayers(false);
-              setShowHalfFilledOnly((shown) => !shown);
-            }
-          }}
-          className={`cursor-pointer bg-card shadow-sm transition-colors hover:border-primary/60 ${
-            showHalfFilledOnly ? "border-primary ring-2 ring-primary/30" : "border-border"
-          }`}
-        >
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {t("halfFilledGroups")}
-              </CardTitle>
-              <TrendingUp className="h-5 w-5 text-amber-500" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-foreground">
-              {isLoadingHalfFilled ? (
-                <Loader2 className="animate-spin w-8 h-8" />
-              ) : (
-                (halfFilledData?.data?.total ?? 0)
-              )}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {showHalfFilledOnly ? t("showAllGroups") : t("halfFilledGroupsShort")}
-            </p>
-          </CardContent>
-        </Card>
+          }
+        }}
+        className={`cursor-pointer bg-card shadow-sm transition-colors hover:border-primary/60 ${
+          showHalfFilledOnly ? "border-primary ring-2 ring-primary/30" : "border-border"
+        }`}
+      >
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("halfFilledGroups")}
+            </CardTitle>
+            <TrendingUp className="h-5 w-5 text-amber-500" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold text-foreground">
+            {isLoadingHalfFilled ? (
+              <Loader2 className="animate-spin w-8 h-8" />
+            ) : (
+              (halfFilledData?.data?.total ?? 0)
+            )}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {showHalfFilledOnly ? t("showAllGroups") : t("halfFilledGroupsShort")}
+          </p>
+        </CardContent>
+      </Card>
 
-        <Card
-          role="button"
-          tabIndex={0}
-          aria-pressed={showHalfPayers}
-          onClick={() => {
+      <Card
+        role="button"
+        tabIndex={0}
+        aria-pressed={showHalfPayers}
+        onClick={() => {
+          setShowHalfFilledOnly(false);
+          setShowHalfPayers((shown) => !shown);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
             setShowHalfFilledOnly(false);
             setShowHalfPayers((shown) => !shown);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              setShowHalfFilledOnly(false);
-              setShowHalfPayers((shown) => !shown);
-            }
-          }}
-          className={`cursor-pointer bg-card shadow-sm transition-colors hover:border-primary/60 ${
-            showHalfPayers ? "border-primary ring-2 ring-primary/30" : "border-border"
-          }`}
-        >
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {t("halfPayingStudents")}
-              </CardTitle>
-              <CreditCard className="h-5 w-5 text-rose-500" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-foreground">
-              {isLoadingFees ? (
-                <Loader2 className="animate-spin w-8 h-8" />
-              ) : (
-                feeBreakdown.halfPayers.length
-              )}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {showHalfPayers
-                ? t("showAllGroups")
-                : t("halfPayingStudentsHint").replace(
-                    "{{fee}}",
-                    feeBreakdown.standardFee
-                      ? new Intl.NumberFormat("uz-UZ").format(
-                          feeBreakdown.standardFee,
-                        )
-                      : "-",
-                  )}
-            </p>
-          </CardContent>
-        </Card>
+          }
+        }}
+        className={`cursor-pointer bg-card shadow-sm transition-colors hover:border-primary/60 ${
+          showHalfPayers ? "border-primary ring-2 ring-primary/30" : "border-border"
+        }`}
+      >
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("halfPayingStudents")}
+            </CardTitle>
+            <CreditCard className="h-5 w-5 text-rose-500" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold text-foreground">
+            {isLoadingFees ? (
+              <Loader2 className="animate-spin w-8 h-8" />
+            ) : (
+              feeBreakdown.halfPayers.length
+            )}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {showHalfPayers
+              ? t("showAllGroups")
+              : t("halfPayingStudentsHint").replace(
+                  "{{fee}}",
+                  feeBreakdown.standardFee
+                    ? new Intl.NumberFormat("uz-UZ").format(
+                        feeBreakdown.standardFee,
+                      )
+                    : "-",
+                )}
+          </p>
+        </CardContent>
+      </Card>
       </motion.div>
 
       <motion.div
