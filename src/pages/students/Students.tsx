@@ -33,7 +33,6 @@ import {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   Trash2,
   Users as UsersIcon,
-  Calendar,
   Filter,
   Download,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -53,7 +52,6 @@ import { StudentDialog } from "./StudentDialog";
 import { StudentWithContractDialog } from "./StudentWithContractDialog";
 import { exportStudents } from "@/lib/export-utils";
 import { formatGroupSelectLabel, formatNameParts } from "@/lib/name-utils";
-import { format } from "date-fns";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useLanguageStore } from "@/store/languageStore";
 import { useGroupsStore } from "@/store/groupsStore";
@@ -696,14 +694,12 @@ export default function Students() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t("studentName")}</TableHead>
-                <TableHead className="hidden md:table-cell">
-                  {t("contact")}
-                </TableHead>
-                <TableHead className="hidden lg:table-cell">
+                <TableHead>{t("contractNumber")}</TableHead>
+                <TableHead className="hidden sm:table-cell">
                   {t("group")}
                 </TableHead>
-                <TableHead className="hidden lg:table-cell">
-                  {t("dateOfBirth")}
+                <TableHead className="hidden md:table-cell">
+                  {t("phone")}
                 </TableHead>
                 <TableHead>{t("status")}</TableHead>
                 <TableHead className="text-right [&>div]:justify-end">
@@ -732,39 +728,27 @@ export default function Students() {
                           >
                             {formatNameParts(student.last_name, student.first_name)}
                           </Link>
-                          {contractNumberByStudent.get(student.id) && (
-                            <p className="text-xs font-mono text-muted-foreground truncate">
-                              {contractNumberByStudent.get(student.id)}
-                            </p>
-                          )}
-                          <p className="text-sm text-muted-foreground truncate">
+                          <p className="text-xs text-muted-foreground truncate sm:hidden">
+                            {allGroups.find((g) => g.id === student.group_id)
+                              ?.name || t("noGroup")}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate md:hidden">
                             {student.phone}
                           </p>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <div>
-                        <p className="text-sm text-foreground">
-                          {student.phone}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                          {student.address}
-                        </p>
-                      </div>
+                    <TableCell className="font-mono text-sm">
+                      {contractNumberByStudent.get(student.id) || "-"}
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell">
+                    <TableCell className="hidden sm:table-cell">
                       <Badge variant="outline">
                         {allGroups.find((g) => g.id === student.group_id)
                           ?.name || t("noGroup") || "No Group"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Calendar className="w-4 h-4" />
-                        {student.date_of_birth &&
-                          format(new Date(student.date_of_birth), "dd-MM-yyyy")}
-                      </div>
+                    <TableCell className="hidden md:table-cell text-sm">
+                      {student.phone}
                     </TableCell>
                     <TableCell>{getStatusBadge(student.status)}</TableCell>
                     <TableCell className="text-right">
