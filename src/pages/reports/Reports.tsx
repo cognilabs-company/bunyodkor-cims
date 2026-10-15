@@ -796,27 +796,44 @@ export default function Reports() {
             {t("analyticsAndInsights")}
           </p>
         </div>
-        {activeTab !== "payers" && activeTab !== "terminated" && (
-          <div className="flex flex-wrap gap-2">
-            {/* The grouped debtors workbook belongs to the debtors tab; the
-                finance and attendance tabs export their own report only. */}
-            {activeTab === "debtors" ? (
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={() => handleGroupedDebtorsExport("debtors")}
-              >
-                <Download className="w-4 h-4" />
-                {t("groupedDebtorsExport")}
-              </Button>
-            ) : (
-              <Button variant="outline" className="gap-2" onClick={handleExport}>
-                <Download className="w-4 h-4" />
-                {t("exportReport")}
-              </Button>
-            )}
-          </div>
-        )}
+        {activeTab !== "payers" &&
+          activeTab !== "terminated" &&
+          activeTab !== "coaches" &&
+          (activeTab !== "monthly" || can("reports:finance:view")) && (
+            <div className="flex flex-wrap gap-2">
+              {/* The grouped debtors workbook belongs to the debtors tab, the
+                  monthly tab exports its server-built workbook, and the finance
+                  and attendance tabs export their own report only. */}
+              {activeTab === "debtors" ? (
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => handleGroupedDebtorsExport("debtors")}
+                >
+                  <Download className="w-4 h-4" />
+                  {t("groupedDebtorsExport")}
+                </Button>
+              ) : activeTab === "monthly" ? (
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleTerminationsMonthlyExport}
+                >
+                  <Download className="w-4 h-4" />
+                  {t("terminationsMonthlyExport")}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleExport}
+                >
+                  <Download className="w-4 h-4" />
+                  {t("exportReport")}
+                </Button>
+              )}
+            </div>
+          )}
       </motion.div>
 
       <motion.div
@@ -1727,16 +1744,6 @@ export default function Reports() {
                     triggerClassName="h-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   />
                 </div>
-                {can("reports:finance:view") && (
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={handleTerminationsMonthlyExport}
-                  >
-                    <Download className="w-4 h-4" />
-                    {t("terminationsMonthlyExport")}
-                  </Button>
-                )}
               </div>
             </CardContent>
           </Card>
