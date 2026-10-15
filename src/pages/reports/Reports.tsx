@@ -7,6 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Table,
@@ -95,6 +104,9 @@ export default function Reports() {
     | "coaches"
   >("finance");
   const [monthlyYear, setMonthlyYear] = useState<number>(currentYear);
+  const [monthlyExportOpen, setMonthlyExportOpen] = useState(false);
+  const [monthlyExportYear, setMonthlyExportYear] = useState<number>(currentYear);
+  const [monthlyExportLoading, setMonthlyExportLoading] = useState(false);
   const [dateRange, setDateRange] = useState({
     from: `${currentYear}-01-01`,
     to: `${currentYear}-12-31`,
@@ -655,24 +667,27 @@ export default function Reports() {
     monthKeys[month - 1] ? t(monthKeys[month - 1]) || fallback : fallback;
 
   const handleTerminationsMonthlyExport = async () => {
-    const promise = (async () => {
+    setMonthlyExportLoading(true);
+
+    try {
       const blob = await reportService.exportTerminationsMonthlyExcel({
-        year: monthlyYear,
+        year: monthlyExportYear,
       });
       if (!blob || blob.size === 0) {
         throw new Error("NO_DATA");
       }
-      downloadFile(blob, `terminations_${monthlyYear}.xlsx`);
-    })();
-
-    toast.promise(promise, {
-      loading: t("exportingData"),
-      success: t("exportedSuccessfully"),
-      error: (error: Error) =>
-        error.message === "NO_DATA"
+      downloadFile(blob, `terminations_${monthlyExportYear}.xlsx`);
+      toast.success(t("exportedSuccessfully"));
+      setMonthlyExportOpen(false);
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message === "NO_DATA"
           ? t("noDataToExport")
           : t("errorExportingData"),
-    });
+      );
+    } finally {
+      setMonthlyExportLoading(false);
+    }
   };
 
   const handleRegistrationExport = async () => {
@@ -817,7 +832,10 @@ export default function Reports() {
                 <Button
                   variant="outline"
                   className="gap-2"
-                  onClick={handleTerminationsMonthlyExport}
+                  onClick={() => {
+                    setMonthlyExportYear(monthlyYear);
+                    setMonthlyExportOpen(true);
+                  }}
                 >
                   <Download className="w-4 h-4" />
                   {t("terminationsMonthlyExport")}
@@ -1964,6 +1982,64 @@ export default function Reports() {
       )}
 
       {activeTab === "payers" && <PayersReport />}
+
+      <Dialog open={monthlyExportOpen} onOpenChange={setMonthlyExportOpen}>
+        <DialogContent
+          className="sm:max-w-md"
+          onClose={() => setMonthlyExportOpen(false)}
+        >
+          <DialogHeader>
+            <DialogTitle>{t("terminationsMonthlyExport")}</DialogTitle>
+            <DialogDescription>
+              {t("selectExportYearDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 px-6 py-2">
+            <Label>{t("year")}</Label>
+            <SearchableSelect
+              value={String(monthlyExportYear)}
+              onValueChange={(value) =>
+                setMonthlyExportYear(value ? Number(value) : currentYear)
+              }
+              options={[
+                currentYear - 3,
+                currentYear - 2,
+                currentYear - 1,
+                currentYear,
+              ].map((year) => ({
+                value: String(year),
+                label: String(year),
+              }))}
+              placeholder={t("selectExportYear")}
+              searchPlaceholder={`${t("search")}...`}
+              emptyText={t("noDataFound")}
+              className="w-full"
+              triggerClassName="h-10"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setMonthlyExportOpen(false)}
+              disabled={monthlyExportLoading}
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              onClick={handleTerminationsMonthlyExport}
+              disabled={monthlyExportLoading}
+              className="gap-2"
+            >
+              {monthlyExportLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {monthlyExportLoading ? t("exportingData") : t("export")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

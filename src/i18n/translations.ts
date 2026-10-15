@@ -371,6 +371,9 @@
     monthlyContractsReport: "Monthly contracts & terminations",
     coachesSummaryReport: "Coaches summary",
     terminationsMonthlyExport: "Terminations Excel (by month)",
+    selectExportYear: "Select a year",
+    selectExportYearDescription:
+      "Choose the year whose termination report you want to export.",
     totalContractsOpened: "Contracts opened",
     totalTerminationsCount: "Terminations",
     contractsOpened: "Opened",
@@ -1531,6 +1534,9 @@
     monthlyContractsReport: "Oyma-oy shartnoma va bekor",
     coachesSummaryReport: "Murabbiylar xulosasi",
     terminationsMonthlyExport: "Bekor qilinganlar Excel (oyma-oy)",
+    selectExportYear: "Yilni tanlang",
+    selectExportYearDescription:
+      "Eksport qilinadigan bekor qilinganlar hisoboti yilini tanlang.",
     totalContractsOpened: "Ochilgan shartnomalar",
     totalTerminationsCount: "Bekor qilinganlar",
     contractsOpened: "Ochilgan",
@@ -2681,6 +2687,9 @@
     monthlyContractsReport: "Договоры и расторжения по месяцам",
     coachesSummaryReport: "Сводка по тренерам",
     terminationsMonthlyExport: "Расторжения Excel (по месяцам)",
+    selectExportYear: "Выберите год",
+    selectExportYearDescription:
+      "Выберите год отчета по расторжениям для экспорта.",
     totalContractsOpened: "Открыто договоров",
     totalTerminationsCount: "Расторжений",
     contractsOpened: "Открыто",
