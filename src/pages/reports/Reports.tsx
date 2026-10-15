@@ -666,6 +666,16 @@ export default function Reports() {
   const monthName = (month: number, fallback: string) =>
     monthKeys[month - 1] ? t(monthKeys[month - 1]) || fallback : fallback;
 
+  const shortMonthName = (month: number, fallback: string) => {
+    const name = monthName(month, fallback);
+    return name.slice(0, month === 6 || month === 7 ? 4 : 3);
+  };
+
+  const handleMonthlyExportOpenChange = (open: boolean) => {
+    if (monthlyExportLoading) return;
+    setMonthlyExportOpen(open);
+  };
+
   const handleTerminationsMonthlyExport = async () => {
     setMonthlyExportLoading(true);
 
@@ -1801,6 +1811,7 @@ export default function Reports() {
               ) : (monthlyReportData?.data?.items?.length ?? 0) > 0 ? (
                 <GroupedBarChart
                   height={280}
+                  variant="analytics"
                   series={[
                     {
                       key: "contracts",
@@ -1814,7 +1825,7 @@ export default function Reports() {
                     },
                   ]}
                   data={(monthlyReportData?.data?.items ?? []).map((item) => ({
-                    label: monthName(item.month, item.month_label).slice(0, 3),
+                    label: shortMonthName(item.month, item.month_label),
                     tooltipLabel: monthName(item.month, item.month_label),
                     values: {
                       contracts: item.contracts_count,
@@ -1983,10 +1994,14 @@ export default function Reports() {
 
       {activeTab === "payers" && <PayersReport />}
 
-      <Dialog open={monthlyExportOpen} onOpenChange={setMonthlyExportOpen}>
+      <Dialog
+        open={monthlyExportOpen}
+        onOpenChange={handleMonthlyExportOpenChange}
+        closeOnOverlayClick={!monthlyExportLoading}
+      >
         <DialogContent
           className="sm:max-w-md"
-          onClose={() => setMonthlyExportOpen(false)}
+          onClose={() => handleMonthlyExportOpenChange(false)}
         >
           <DialogHeader>
             <DialogTitle>{t("terminationsMonthlyExport")}</DialogTitle>
@@ -1995,8 +2010,9 @@ export default function Reports() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 px-6 py-2">
-            <Label>{t("year")}</Label>
+            <Label htmlFor="monthly-export-year">{t("year")}</Label>
             <SearchableSelect
+              id="monthly-export-year"
               value={String(monthlyExportYear)}
               onValueChange={(value) =>
                 setMonthlyExportYear(value ? Number(value) : currentYear)
@@ -2013,14 +2029,16 @@ export default function Reports() {
               placeholder={t("selectExportYear")}
               searchPlaceholder={`${t("search")}...`}
               emptyText={t("noDataFound")}
+              searchable={false}
               className="w-full"
               triggerClassName="h-10"
+              contentClassName="z-[10000]"
             />
           </div>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setMonthlyExportOpen(false)}
+              onClick={() => handleMonthlyExportOpenChange(false)}
               disabled={monthlyExportLoading}
             >
               {t("cancel")}

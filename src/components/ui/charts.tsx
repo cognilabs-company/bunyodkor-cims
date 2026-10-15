@@ -151,6 +151,7 @@ interface GroupedBarChartProps {
   animate?: boolean
   className?: string
   valueFormatter?: (value: number) => string
+  variant?: 'default' | 'analytics'
 }
 
 export const GroupedBarChart = ({
@@ -160,6 +161,7 @@ export const GroupedBarChart = ({
   animate = true,
   className,
   valueFormatter,
+  variant = 'default',
 }: GroupedBarChartProps) => {
   const maxValue = Math.max(
     ...data.flatMap((d) => series.map((s) => d.values[s.key] ?? 0)),
@@ -168,6 +170,143 @@ export const GroupedBarChart = ({
   const safeMaxValue = maxValue > 0 ? maxValue : 1
   const formatValue = (value: number) =>
     valueFormatter ? valueFormatter(value) : value.toLocaleString()
+
+  if (variant === 'analytics') {
+    const roughStep = safeMaxValue / 4
+    const magnitude = 10 ** Math.floor(Math.log10(roughStep))
+    const residual = roughStep / magnitude
+    const stepMultiplier = residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10
+    const step = stepMultiplier * magnitude
+    const scaleMax = Math.ceil(safeMaxValue / step) * step
+    const tickCount = Math.round(scaleMax / step) + 1
+    const ticks = Array.from({ length: tickCount }, (_, index) => scaleMax - step * index)
+    const chartMinWidth = Math.max(560, data.length * 52)
+
+    return (
+      <div className={cn('flex flex-col gap-4', className)}>
+        <div className="flex flex-wrap items-center gap-2">
+          {series.map((item) => (
+            <div
+              key={item.key}
+              className="flex items-center gap-2 rounded-full border border-border/70 bg-muted/30 px-3 py-1.5 text-xs font-medium text-foreground"
+            >
+              <span
+                className="h-2.5 w-2.5 rounded-full shadow-sm"
+                style={{ backgroundColor: item.color }}
+              />
+              {item.label}
+            </div>
+          ))}
+        </div>
+
+        <div className="overflow-x-auto pb-1">
+          <div
+            className="flex flex-col"
+            style={{ height, minWidth: chartMinWidth }}
+          >
+            <div className="flex min-h-0 flex-1">
+              <div className="flex w-12 shrink-0 flex-col justify-between pb-px pr-3 text-right text-[10px] tabular-nums text-muted-foreground sm:text-xs">
+                {ticks.map((tick) => (
+                  <span key={tick}>{formatValue(tick)}</span>
+                ))}
+              </div>
+
+              <div className="relative min-w-0 flex-1 border-b border-l border-border/80">
+                <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+                  {ticks.map((tick) => (
+                    <span
+                      key={tick}
+                      className="block w-full border-t border-dashed border-border/60 first:border-solid"
+                    />
+                  ))}
+                </div>
+
+                <div className="absolute inset-0 flex items-end gap-1 px-2 sm:gap-2 sm:px-3">
+                  {data.map((item, index) => (
+                    <div
+                      key={item.label}
+                      tabIndex={0}
+                      className="group relative flex h-full min-w-0 flex-1 items-end justify-center gap-1 outline-none sm:gap-1.5"
+                      aria-label={item.tooltipLabel || item.label}
+                    >
+                      <div
+                        className={cn(
+                          'pointer-events-none absolute top-3 z-30 w-max min-w-40 rounded-lg border border-border/80 bg-popover/95 p-3 text-popover-foreground opacity-0 shadow-xl backdrop-blur-sm transition-all duration-150 group-hover:-translate-y-1 group-hover:opacity-100 group-focus:-translate-y-1 group-focus:opacity-100',
+                          index === 0
+                            ? 'left-0'
+                            : index === data.length - 1
+                              ? 'right-0'
+                              : 'left-1/2 -translate-x-1/2 group-hover:-translate-x-1/2 group-focus:-translate-x-1/2'
+                        )}
+                      >
+                        <div className="mb-2 text-xs font-semibold">
+                          {item.tooltipLabel || item.label}
+                        </div>
+                        <div className="space-y-1.5">
+                          {series.map((entry) => (
+                            <div
+                              key={entry.key}
+                              className="flex items-center justify-between gap-5 text-xs"
+                            >
+                              <span className="flex items-center gap-2 text-muted-foreground">
+                                <span
+                                  className="h-2 w-2 rounded-full"
+                                  style={{ backgroundColor: entry.color }}
+                                />
+                                {entry.label}
+                              </span>
+                              <span className="font-semibold tabular-nums">
+                                {formatValue(item.values[entry.key] ?? 0)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {series.map((entry) => {
+                        const value = item.values[entry.key] ?? 0
+                        return (
+                          <motion.div
+                            key={entry.key}
+                            className="relative min-h-[3px] w-full max-w-7 rounded-t-md shadow-sm transition-[filter,opacity] duration-200 group-hover:brightness-105"
+                            style={{
+                              background: `linear-gradient(180deg, color-mix(in srgb, ${entry.color} 70%, white) 0%, ${entry.color} 100%)`,
+                            }}
+                            initial={animate ? { height: 0, opacity: 0.5 } : undefined}
+                            animate={{
+                              height: `${(value / scaleMax) * 100}%`,
+                              opacity: 1,
+                            }}
+                            transition={{
+                              duration: 0.65,
+                              delay: index * 0.04,
+                              ease: 'easeOut',
+                            }}
+                          />
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 gap-1 pl-12 pt-2 sm:gap-2">
+              {data.map((item) => (
+                <div
+                  key={item.label}
+                  className="min-w-0 flex-1 truncate text-center text-[10px] font-medium text-muted-foreground sm:text-xs"
+                  title={item.tooltipLabel || item.label}
+                >
+                  {item.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={cn('flex flex-col gap-3', className)}>
