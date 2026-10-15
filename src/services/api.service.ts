@@ -86,6 +86,8 @@ import type {
   // Year Limits
   YearLimitRead,
   YearLimitUsage,
+  MonthlyContractsTerminationsReport,
+  CoachesSummaryReport,
   YearLimitCreateRequest,
   YearLimitUpdateRequest,
   // Common
@@ -2194,6 +2196,32 @@ export const reportService = {
       params,
       responseType: "blob",
     });
+    return response.data;
+  },
+
+  getMonthlyContractsTerminations: async (params?: {
+    year?: number;
+  }): Promise<ApiResponse<MonthlyContractsTerminationsReport>> => {
+    const response = await apiClient.get<
+      ApiResponse<MonthlyContractsTerminationsReport>
+    >("/reports/monthly-contracts-terminations", { params });
+    return response.data;
+  },
+
+  getCoachesSummary: async (): Promise<ApiResponse<CoachesSummaryReport>> => {
+    const response = await apiClient.get<ApiResponse<CoachesSummaryReport>>(
+      "/reports/coaches-summary",
+    );
+    return response.data;
+  },
+
+  exportTerminationsMonthlyExcel: async (params: {
+    year: number;
+  }): Promise<Blob> => {
+    const response = await apiClient.get<Blob>(
+      "/reports/terminations-monthly-excel",
+      { params: { year: params.year }, responseType: "blob" },
+    );
     return response.data;
   },
 

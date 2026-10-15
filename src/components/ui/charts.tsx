@@ -132,6 +132,102 @@ export const BarChart = ({
   )
 }
 
+interface GroupedBarSeries {
+  key: string
+  label: string
+  color: string
+}
+
+interface GroupedBarDatum {
+  label: string
+  tooltipLabel?: string
+  values: Record<string, number>
+}
+
+interface GroupedBarChartProps {
+  data: GroupedBarDatum[]
+  series: GroupedBarSeries[]
+  height?: number
+  animate?: boolean
+  className?: string
+  valueFormatter?: (value: number) => string
+}
+
+export const GroupedBarChart = ({
+  data,
+  series,
+  height = 300,
+  animate = true,
+  className,
+  valueFormatter,
+}: GroupedBarChartProps) => {
+  const maxValue = Math.max(
+    ...data.flatMap((d) => series.map((s) => d.values[s.key] ?? 0)),
+    0
+  )
+  const safeMaxValue = maxValue > 0 ? maxValue : 1
+  const formatValue = (value: number) =>
+    valueFormatter ? valueFormatter(value) : value.toLocaleString()
+
+  return (
+    <div className={cn('flex flex-col gap-3', className)}>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        {series.map((s) => (
+          <div key={s.key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span
+              className="h-2.5 w-2.5 rounded-sm"
+              style={{ backgroundColor: s.color }}
+            />
+            {s.label}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col" style={{ height }}>
+        <div className="flex flex-1 items-end gap-1 border-b border-border pb-0 sm:gap-2">
+          {data.map((item, index) => (
+            <div
+              key={item.label}
+              className="flex flex-1 items-end justify-center gap-[2px] sm:gap-1"
+            >
+              {series.map((s) => {
+                const value = item.values[s.key] ?? 0
+                return (
+                  <motion.div
+                    key={s.key}
+                    className="w-full min-h-[2px] rounded-t-sm"
+                    style={{ backgroundColor: s.color }}
+                    title={`${item.tooltipLabel || item.label} — ${s.label}: ${formatValue(value)}`}
+                    initial={animate ? { height: 0 } : undefined}
+                    animate={{ height: `${(value / safeMaxValue) * 100}%` }}
+                    transition={{
+                      duration: 0.6,
+                      delay: index * 0.04,
+                      ease: 'easeOut',
+                    }}
+                  />
+                )
+              })}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-1 pt-2 sm:gap-2">
+          {data.map((item) => (
+            <div
+              key={item.label}
+              className="flex-1 truncate text-center text-[10px] text-muted-foreground sm:text-xs"
+              title={item.tooltipLabel || item.label}
+            >
+              {item.label}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Donut/Pie Chart
 interface DonutChartProps extends BaseChartProps {
   donut?: boolean

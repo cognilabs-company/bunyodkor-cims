@@ -18,7 +18,12 @@ import {
   TablePagination,
   TableEmpty,
 } from "@/components/ui/table";
-import { BarChart, DonutChart, StatsCard } from "@/components/ui/charts";
+import {
+  BarChart,
+  DonutChart,
+  GroupedBarChart,
+  StatsCard,
+} from "@/components/ui/charts";
 import {
   reportService,
   groupService,
@@ -37,6 +42,9 @@ import {
   CheckCircle,
   Loader2,
   XCircle,
+  CalendarRange,
+  UserCheck,
+  FileText,
 } from "lucide-react";
 import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
 import toast from "react-hot-toast";
@@ -48,6 +56,7 @@ import {
   formatCurrency as formatCurrencyUtil,
 } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const ATTENDANCE_CHART_LIMIT = 12;
 
@@ -75,9 +84,17 @@ export default function Reports() {
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
+  const { can } = usePermissions();
   const [activeTab, setActiveTab] = useState<
-    "finance" | "attendance" | "debtors" | "payers" | "terminated"
+    | "finance"
+    | "attendance"
+    | "debtors"
+    | "payers"
+    | "terminated"
+    | "monthly"
+    | "coaches"
   >("finance");
+  const [monthlyYear, setMonthlyYear] = useState<number>(currentYear);
   const [dateRange, setDateRange] = useState({
     from: `${currentYear}-01-01`,
     to: `${currentYear}-12-31`,
@@ -484,6 +501,23 @@ export default function Reports() {
     refetchOnWindowFocus: false,
   });
 
+  const { data: monthlyReportData, isLoading: monthlyReportLoading } = useQuery({
+    queryKey: ["monthly-contracts-terminations", monthlyYear],
+    queryFn: () =>
+      reportService.getMonthlyContractsTerminations({ year: monthlyYear }),
+    enabled: activeTab === "monthly",
+    staleTime: 60000,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: coachesSummaryData, isLoading: coachesSummaryLoading } = useQuery({
+    queryKey: ["coaches-summary"],
+    queryFn: () => reportService.getCoachesSummary(),
+    enabled: activeTab === "coaches",
+    staleTime: 60000,
+    refetchOnWindowFocus: false,
+  });
+
   const effectiveDebtorsData = hasAdvancedUnpaidListFilter ? debtorsFilteredData : debtorsData;
   const debtorsLoading = hasUnpaidListFilter
     ? (hasAdvancedUnpaidListFilter ? isDebtorsFilteredLoading : isDebtorsBaseLoading)
@@ -528,6 +562,8 @@ export default function Reports() {
     { id: "debtors", label: t("debtors"), icon: AlertTriangle },
     { id: "payers", label: t("payersReport"), icon: Users },
     { id: "terminated", label: t("terminatedReport"), icon: XCircle },
+    { id: "monthly", label: t("monthlyContractsReport"), icon: CalendarRange },
+    { id: "coaches", label: t("coachesSummaryReport"), icon: UserCheck },
   ];
 
   const paymentSourcesData =
@@ -600,6 +636,45 @@ export default function Reports() {
   // The registration register for one year: every contract of that year,
   // however it ended, with its twelve monthly payment columns. The year is
   // the only parameter the endpoint takes, so "all years" cannot be exported.
+  const monthKeys = [
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+  ] as const;
+
+  const monthName = (month: number, fallback: string) =>
+    monthKeys[month - 1] ? t(monthKeys[month - 1]) || fallback : fallback;
+
+  const handleTerminationsMonthlyExport = async () => {
+    const promise = (async () => {
+      const blob = await reportService.exportTerminationsMonthlyExcel({
+        year: monthlyYear,
+      });
+      if (!blob || blob.size === 0) {
+        throw new Error("NO_DATA");
+      }
+      downloadFile(blob, `terminations_${monthlyYear}.xlsx`);
+    })();
+
+    toast.promise(promise, {
+      loading: t("exportingData"),
+      success: t("exportedSuccessfully"),
+      error: (error: Error) =>
+        error.message === "NO_DATA"
+          ? t("noDataToExport")
+          : t("errorExportingData"),
+    });
+  };
+
   const handleRegistrationExport = async () => {
     if (terminatedYear === "") {
       toast.error(t("selectYearFirst"));
@@ -1614,6 +1689,266 @@ export default function Reports() {
                     title={t("noData")}
                     description={t("noTerminatedContracts")?.replace("{{year}}", String(terminatedYear)) || ""}
                   />
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </motion.div>
+      )}
+
+      {activeTab === "monthly" && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="w-56">
+                  <label className="text-sm font-medium text-foreground mb-1 block">
+                    {t("year")}
+                  </label>
+                  <SearchableSelect
+                    value={String(monthlyYear)}
+                    onValueChange={(value) =>
+                      setMonthlyYear(value ? Number(value) : currentYear)
+                    }
+                    options={[
+                      currentYear - 3,
+                      currentYear - 2,
+                      currentYear - 1,
+                      currentYear,
+                    ].map((y) => ({ value: String(y), label: String(y) }))}
+                    placeholder={String(currentYear)}
+                    searchPlaceholder={`${t("search")}...`}
+                    emptyText={t("noDataFound")}
+                    className="w-full"
+                    triggerClassName="h-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  />
+                </div>
+                {can("reports:finance:view") && (
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={handleTerminationsMonthlyExport}
+                  >
+                    <Download className="w-4 h-4" />
+                    {t("terminationsMonthlyExport")}
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <StatsCard
+              title={t("totalContractsOpened")}
+              value={
+                monthlyReportLoading
+                  ? "-"
+                  : (monthlyReportData?.data?.total_contracts ?? 0).toLocaleString()
+              }
+              icon={<FileText className="w-6 h-6" />}
+            />
+            <StatsCard
+              title={t("totalTerminationsCount")}
+              value={
+                monthlyReportLoading
+                  ? "-"
+                  : (monthlyReportData?.data?.total_terminations ?? 0).toLocaleString()
+              }
+              icon={<XCircle className="w-6 h-6" />}
+            />
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">
+                {t("monthlyContractsReport")} — {monthlyYear}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {monthlyReportLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : (monthlyReportData?.data?.items?.length ?? 0) > 0 ? (
+                <GroupedBarChart
+                  height={280}
+                  series={[
+                    {
+                      key: "contracts",
+                      label: t("contractsOpened"),
+                      color: "hsl(221, 83%, 53%)",
+                    },
+                    {
+                      key: "terminations",
+                      label: t("terminationsCount"),
+                      color: "hsl(349, 89%, 60%)",
+                    },
+                  ]}
+                  data={(monthlyReportData?.data?.items ?? []).map((item) => ({
+                    label: monthName(item.month, item.month_label).slice(0, 3),
+                    tooltipLabel: monthName(item.month, item.month_label),
+                    values: {
+                      contracts: item.contracts_count,
+                      terminations: item.terminations_count,
+                    },
+                  }))}
+                />
+              ) : (
+                <p className="py-12 text-center text-sm text-muted-foreground">
+                  {t("noData")}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <Table isLoading={monthlyReportLoading}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("month")}</TableHead>
+                  <TableHead className="text-right [&>div]:justify-end">
+                    {t("contractsOpened")}
+                  </TableHead>
+                  <TableHead className="text-right [&>div]:justify-end">
+                    {t("terminationsCount")}
+                  </TableHead>
+                  <TableHead className="text-right [&>div]:justify-end">
+                    {t("netChange")}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(monthlyReportData?.data?.items?.length ?? 0) > 0 ? (
+                  <>
+                    {monthlyReportData!.data.items.map((item) => {
+                      const net = item.contracts_count - item.terminations_count;
+                      return (
+                        <TableRow key={item.month}>
+                          <TableCell className="font-medium">
+                            {monthName(item.month, item.month_label)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {item.contracts_count.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {item.terminations_count.toLocaleString()}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right tabular-nums font-medium ${
+                              net < 0
+                                ? "text-rose-600 dark:text-rose-400"
+                                : "text-foreground"
+                            }`}
+                          >
+                            {net > 0 ? "+" : ""}
+                            {net.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    <TableRow className="bg-muted/40 font-semibold">
+                      <TableCell>{t("total")}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {(monthlyReportData?.data?.total_contracts ?? 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {(monthlyReportData?.data?.total_terminations ?? 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {(
+                          (monthlyReportData?.data?.total_contracts ?? 0) -
+                          (monthlyReportData?.data?.total_terminations ?? 0)
+                        ).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  </>
+                ) : (
+                  <TableEmpty
+                    title={t("noData")}
+                    description={String(monthlyYear)}
+                  />
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </motion.div>
+      )}
+
+      {activeTab === "coaches" && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <StatsCard
+              title={t("totalCoaches")}
+            value={
+                coachesSummaryLoading
+                  ? "-"
+                  : (coachesSummaryData?.data?.total_coaches ?? 0).toLocaleString()
+              }
+              icon={<UserCheck className="w-6 h-6" />}
+            />
+            <StatsCard
+              title={t("totalGroups")}
+              value={
+                coachesSummaryLoading
+                  ? "-"
+                  : (coachesSummaryData?.data?.total_groups ?? 0).toLocaleString()
+              }
+              icon={<Users className="w-6 h-6" />}
+            />
+            <StatsCard
+              title={t("totalStudents")}
+              value={
+                coachesSummaryLoading
+                  ? "-"
+                  : (coachesSummaryData?.data?.total_students ?? 0).toLocaleString()
+              }
+              icon={<Users className="w-6 h-6" />}
+            />
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">
+                {t("coachesSummaryReport")}
+              </CardTitle>
+            </CardHeader>
+            <Table isLoading={coachesSummaryLoading}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("coach")}</TableHead>
+                  <TableHead className="text-right [&>div]:justify-end">
+                    {t("groupsCount")}
+                  </TableHead>
+                  <TableHead className="text-right [&>div]:justify-end">
+                    {t("studentsCount")}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(coachesSummaryData?.data?.items?.length ?? 0) > 0 ? (
+                  coachesSummaryData!.data.items.map((item, index) => (
+                    <TableRow key={item.coach_id ?? `unassigned-${index}`}>
+                      <TableCell className="font-medium">
+                        {item.coach_name}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {item.groups_count.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {item.students_count.toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableEmpty title={t("noData")} description="" />
                 )}
               </TableBody>
             </Table>

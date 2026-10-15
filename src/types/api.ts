@@ -938,3 +938,31 @@ export interface YearLimitUsage {
   is_full: boolean;
   has_limit: boolean;
 }
+
+export interface MonthlyContractTerminationItem {
+  month: number;
+  month_label: string;
+  contracts_count: number;
+  terminations_count: number;
+}
+
+export interface MonthlyContractsTerminationsReport {
+  year: number;
+  items: MonthlyContractTerminationItem[];
+  total_contracts: number;
+  total_terminations: number;
+}
+
+export interface CoachSummaryItem {
+  coach_id: number | null;
+  coach_name: string;
+  groups_count: number;
+  students_count: number;
+}
+
+export interface CoachesSummaryReport {
+  items: CoachSummaryItem[];
+  total_coaches: number;
+  total_groups: number;
+  total_students: number;
+}
