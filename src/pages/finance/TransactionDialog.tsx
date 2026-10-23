@@ -38,7 +38,8 @@ interface TransactionFormData {
   payment_year: number;
   payment_months: string;
   comment?: string;
-  file_type: "malumotnoma" | "bildirgi";
+  file_type: "malumotnoma" | "bildirgi" | "buyruq";
+  order_number?: string;
 }
 
 interface CreateTransactionPayload {
@@ -131,6 +132,7 @@ export function TransactionDialog({
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<TransactionFormData>({
     defaultValues: {
@@ -140,8 +142,13 @@ export function TransactionDialog({
       payment_year: new Date().getFullYear(),
       payment_months: "",
       file_type: "malumotnoma",
+      order_number: "",
     },
   });
+
+  // Tanlangan file turi (buyruq tanlansa, buyruq raqami maydoni chiqadi)
+  const selectedFileType = watch("file_type");
+  const isBuyruq = isSpravkaMode && selectedFileType === "buyruq";
 
   // Yordamchi funksiya: Talaba ma'lumotini topish
   const getStudentInfo = (contract: ContractRead): StudentRead | undefined => {
@@ -234,8 +241,10 @@ export function TransactionDialog({
       setSelectedContract(null);
       setSelectedMonths([]);
       setProofFile(null);
+      setValue("order_number", "");
+      setValue("file_type", "malumotnoma");
     }
-  }, [open]);
+  }, [open, setValue]);
 
   // Dropdowndan tashqariga bosilganda yopish
   useEffect(() => {
@@ -381,6 +390,16 @@ export function TransactionDialog({
         toast.error(t("invalidProofFileFormat"));
         return;
       }
+      if (data.file_type === "buyruq" && !data.order_number?.trim()) {
+        toast.error(t("orderNumberRequired"));
+        return;
+      }
+    }
+
+    // Spravka izohi: file turi, buyruq bo'lsa buyruq raqami bilan birga saqlanadi
+    let spravkaComment = data.file_type as string;
+    if (data.file_type === "buyruq" && data.order_number?.trim()) {
+      spravkaComment = `buyruq №${data.order_number.trim()}`;
     }
 
     mutation.mutate({
@@ -389,7 +408,7 @@ export function TransactionDialog({
       contract_number: data.contract_number,
       payment_year: data.payment_year,
       payment_months: paymentMonthsArray,
-      comment: isSpravkaMode ? data.file_type : data.comment,
+      comment: isSpravkaMode ? spravkaComment : data.comment,
       proof_file: isSpravkaMode ? proofFile : null,
       mode,
     });
@@ -449,7 +468,24 @@ export function TransactionDialog({
               <Select id="file_type" {...register("file_type")}>
                 <option value="malumotnoma">{t("fileTypeMalumotnoma")}</option>
                 <option value="bildirgi">{t("fileTypeBildirgi")}</option>
+                <option value="buyruq">{t("fileTypeBuyruq")}</option>
               </Select>
+            </div>
+          )}
+
+          {isBuyruq && (
+            <div className="space-y-1">
+              <Label htmlFor="order_number">
+                {t("orderNumber")} <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="order_number"
+                placeholder={t("enterOrderNumber")}
+                {...register("order_number")}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("orderNumberHint")}
+              </p>
             </div>
           )}
 
@@ -463,7 +499,8 @@ export function TransactionDialog({
           {isSpravkaMode && (
             <div className="space-y-1">
               <Label htmlFor="proof_file">
-                {t("paymentProof")} <span className="text-red-500">*</span>
+                {isBuyruq ? t("orderFile") : t("paymentProof")}{" "}
+                <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="proof_file"
